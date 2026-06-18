@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-export default function LiveIntelligence({ logs, stats, currentAction }) {
+export default function LiveIntelligence({ logs, stats, currentAction, onStopSearch }) {
   const [latencyBars, setLatencyBars] = useState([]);
   const [latencyVal, setLatencyVal] = useState(24);
   const logsEndRef = useRef(null);
@@ -43,6 +43,28 @@ export default function LiveIntelligence({ logs, stats, currentAction }) {
                 <span className="pulse-node" style={{ backgroundColor: stats.state === 'ACTIVE' ? 'var(--primary-accent)' : 'var(--text-dim)' }}></span>
                 {stats.state === 'ACTIVE' ? 'ACTIVE SCAN' : stats.state}
               </p>
+              {stats.state === 'ACTIVE' && onStopSearch && (
+                <button
+                  onClick={onStopSearch}
+                  style={{
+                    marginTop: '8px',
+                    background: 'transparent',
+                    border: '1px solid #EF4444',
+                    color: '#EF4444',
+                    fontSize: '11px',
+                    padding: '4px 8px',
+                    borderRadius: '2px',
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-mono)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>stop</span>
+                  Stop Search
+                </button>
+              )}
             </div>
             <span className="material-symbols-outlined text-primary-dim">radar</span>
           </div>

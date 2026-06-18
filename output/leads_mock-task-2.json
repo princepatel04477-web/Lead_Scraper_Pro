@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Apex Roofing Toronto",
+    "category": "Roofing Contractors",
+    "score": 96.2,
+    "address": "Toronto, Canada",
+    "phone": "+1 416-555-0182",
+    "email": "quote@apexroofing.ca",
+    "website": "apexroofing.ca",
+    "source": "google_maps"
+  },
+  {
+    "name": "Quality Shingles",
+    "category": "Roofing Contractors",
+    "score": 90.0,
+    "address": "Toronto, Canada",
+    "phone": "+1 416-555-0199",
+    "email": "support@qualityshingles.ca",
+    "website": "qualityshingles.ca",
+    "source": "yellowpages"
+  },
+  {
+    "name": "Metro Roofing Services",
+    "category": "Roofing Contractors",
+    "score": 84.5,
+    "address": "Toronto, Canada",
+    "phone": "+1 416-555-0122",
+    "email": "",
+    "website": "metroroofing.ca",
+    "source": "google_maps"
+  }
+]

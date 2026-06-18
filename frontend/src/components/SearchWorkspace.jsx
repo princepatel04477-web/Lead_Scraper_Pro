@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function SearchWorkspace({ onStartSearch, isScanning }) {
+export default function SearchWorkspace({ onStartSearch, isScanning, searchHistory = [], onLoadPastSearch }) {
   const [niche, setNiche] = useState('');
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('');
@@ -177,6 +177,57 @@ export default function SearchWorkspace({ onStartSearch, isScanning }) {
           Index: 4.2B Nodes
         </span>
       </div>
+
+      {/* Search History Section */}
+      {searchHistory.length > 0 && (
+        <div className="history-sec fade-in-up delay-300">
+          <div className="history-sec-header">
+            <h3 className="history-sec-title">Recent Searches // History Logs</h3>
+          </div>
+          <div className="history-grid">
+            {searchHistory.map((item) => (
+              <div key={item.id} className="history-card">
+                <div className="history-card-header">
+                  <div>
+                    <h4 className="history-card-niche" style={{ margin: 0, fontSize: '15px' }}>{item.niche}</h4>
+                    <div className="history-card-location" style={{ marginTop: '4px' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>
+                        location_on
+                      </span>
+                      {item.city}, {item.country}
+                    </div>
+                  </div>
+                  <span className={`history-stat-tag ${item.status === 'COMPLETED' ? 'success' : item.status === 'ACTIVE' ? 'active' : 'error'}`}>
+                    {item.status}
+                  </span>
+                </div>
+                
+                <div className="history-card-stats" style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  <span className="history-stat-tag">
+                    {item.entities_discovered} Discovered
+                  </span>
+                  <span className="history-stat-tag">
+                    {item.contacts_verified} Verified
+                  </span>
+                </div>
+
+                <div className="history-card-footer">
+                  <span className="history-card-time">{item.timestamp}</span>
+                  <button
+                    type="button"
+                    className="btn-history-load"
+                    onClick={() => onLoadPastSearch(item.id, item.niche, item.city, item.country)}
+                    disabled={isScanning || item.status === 'ACTIVE'}
+                    style={{ opacity: (isScanning || item.status === 'ACTIVE') ? 0.5 : 1 }}
+                  >
+                    Load Results
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

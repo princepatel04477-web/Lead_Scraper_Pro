@@ -1123,3 +1123,329 @@ body {
 .status-select:focus {
   outline: none;
 }
+
+/* Modals styling (Settings & Help) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(9, 9, 9, 0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  animation: slideUpFadeIn 0.2s ease-out forwards;
+}
+
+.modal-container {
+  background-color: var(--bg-color);
+  border: 1px solid var(--outline);
+  width: 90%;
+  max-width: 600px;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--stack-md) var(--stack-lg);
+  border-bottom: 1px solid var(--outline);
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--unit);
+  border-radius: 4px;
+  transition: all 150ms ease;
+}
+
+.modal-close-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--surface-container);
+}
+
+.modal-body {
+  padding: var(--stack-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-md);
+}
+
+.modal-footer {
+  padding: var(--stack-md) var(--stack-lg);
+  border-top: 1px solid var(--outline);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--stack-md);
+  background-color: var(--surface-lowest);
+}
+
+/* Settings elements */
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--unit);
+}
+
+.settings-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.settings-input {
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 2px;
+  width: 100%;
+}
+
+.settings-input:focus {
+  outline: none;
+  border-color: var(--text-primary);
+}
+
+.settings-select {
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 2px;
+  width: 100%;
+}
+
+.settings-select:focus {
+  outline: none;
+  border-color: var(--text-primary);
+}
+
+.settings-switch-label {
+  display: flex;
+  align-items: center;
+  gap: var(--stack-sm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.settings-switch-input {
+  accent-color: var(--primary-accent);
+  cursor: pointer;
+}
+
+.system-status-pills {
+  display: flex;
+  gap: var(--stack-sm);
+  flex-wrap: wrap;
+  margin-top: var(--stack-sm);
+}
+
+/* Help guide elements */
+.help-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-sm);
+}
+
+.help-section-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--primary-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-left: 2px solid var(--primary-accent);
+  padding-left: var(--stack-sm);
+  font-weight: bold;
+}
+
+.help-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.help-list {
+  padding-left: var(--stack-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--unit);
+}
+
+.help-list-item {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* History logs section in SearchWorkspace */
+.history-sec {
+  width: 100%;
+  margin-top: var(--stack-lg);
+  border-top: 1px solid var(--outline);
+  padding-top: var(--stack-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-md);
+  animation: slideUpFadeIn 0.4s ease-out forwards;
+}
+
+.history-sec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-sec-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.history-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--stack-md);
+}
+
+@media(min-width: 768px) {
+  .history-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.history-card {
+  background-color: var(--bg-color);
+  border: 1px solid var(--outline);
+  padding: var(--stack-md);
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-sm);
+  transition: all 150ms ease;
+  position: relative;
+}
+
+.history-card:hover {
+  border-color: var(--outline-variant);
+  background-color: var(--surface-lowest);
+}
+
+.history-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.history-card-niche {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.history-card-location {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--unit);
+}
+
+.history-card-time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.history-card-stats {
+  display: flex;
+  gap: var(--stack-sm);
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.history-stat-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  background-color: #18181B;
+  border: 1px solid #27272A;
+  color: var(--text-muted);
+  border-radius: 2px;
+}
+
+.history-stat-tag.success {
+  border-color: rgba(16, 185, 129, 0.2);
+  color: var(--primary-accent);
+}
+
+.history-stat-tag.active {
+  border-color: rgba(59, 130, 246, 0.2);
+  color: #3B82F6;
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+.history-stat-tag.error {
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #EF4444;
+}
+
+.history-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--stack-sm);
+  padding-top: var(--stack-sm);
+  border-top: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.btn-history-load {
+  background: transparent;
+  border: 1px solid var(--outline);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.btn-history-load:hover {
+  background-color: var(--outline);
+  border-color: var(--text-muted);
+}

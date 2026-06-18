@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Aura Design Studio",
+    "category": "Interior Design",
+    "score": 92.4,
+    "address": "London, UK",
+    "phone": "+44 20 7946 0143",
+    "email": "hello@auradesign.co.uk",
+    "website": "auradesign.co.uk",
+    "source": "google_maps"
+  },
+  {
+    "name": "Bespoke Spaces Ltd",
+    "category": "Interior Design",
+    "score": 88.5,
+    "address": "London, UK",
+    "phone": "+44 20 7946 0188",
+    "email": "info@bespokespaces.co.uk",
+    "website": "bespokespaces.co.uk",
+    "source": "instagram"
+  },
+  {
+    "name": "Chelsea Interiors",
+    "category": "Interior Design",
+    "score": 86.1,
+    "address": "London, UK",
+    "phone": "+44 20 7946 0192",
+    "email": "contact@chelseainteriors.com",
+    "website": "chelseainteriors.com",
+    "source": "google_maps"
+  },
+  {
+    "name": "Design & Craft Co",
+    "category": "Interior Design",
+    "score": 81.3,
+    "address": "London, UK",
+    "phone": "+44 20 7946 0111",
+    "email": "studios@designcraft.co.uk",
+    "website": "designcraft.co.uk",
+    "source": "instagram"
+  }
+]
