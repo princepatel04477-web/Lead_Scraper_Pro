@@ -1,0 +1,328 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>LeadIntel Terminal - Repository</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-surface": "#e4e2e2",
+                        "surface-container-low": "#1b1c1c",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "surface-container": "#1f2020",
+                        "surface-container-lowest": "#0d0e0e",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#303031",
+                        "outline-variant": "#444748",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "secondary": "#c6c6c7",
+                        "surface-tint": "#c9c6c5",
+                        "on-surface-variant": "#c4c7c7",
+                        "on-primary-fixed": "#1c1b1b",
+                        "primary-fixed": "#e5e2e1",
+                        "on-tertiary-container": "#008a5f",
+                        "on-primary-container": "#7a7978",
+                        "tertiary": "#4edea3",
+                        "surface-variant": "#343535",
+                        "on-secondary-fixed": "#1a1c1c",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e4e2e2",
+                        "on-tertiary": "#003824",
+                        "surface-container-highest": "#343535",
+                        "outline": "#8e9192",
+                        "primary-container": "#090909",
+                        "surface-bright": "#393939",
+                        "on-secondary": "#2f3131",
+                        "error-container": "#93000a",
+                        "surface-dim": "#131314",
+                        "background": "#131314",
+                        "primary": "#c9c6c5",
+                        "secondary-container": "#454747",
+                        "on-surface": "#e4e2e2",
+                        "secondary-fixed-dim": "#c6c6c7",
+                        "tertiary-fixed": "#6ffbbe",
+                        "error": "#ffb4ab",
+                        "secondary-fixed": "#e2e2e2",
+                        "surface-container-high": "#292a2a",
+                        "on-primary-fixed-variant": "#474646",
+                        "on-secondary-container": "#b4b5b5",
+                        "on-primary": "#313030",
+                        "surface": "#131314",
+                        "on-tertiary-fixed": "#002113",
+                        "inverse-primary": "#5f5e5e",
+                        "tertiary-container": "#000c05",
+                        "primary-fixed-dim": "#c9c6c5",
+                        "on-secondary-fixed-variant": "#454747"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-max": "1440px",
+                        "margin-page": "40px",
+                        "stack-sm": "8px",
+                        "unit": "4px",
+                        "stack-md": "16px",
+                        "stack-lg": "32px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "display": ["Geist"],
+                        "headline-lg": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "label-mono": ["JetBrains Mono"],
+                        "headline-lg-mobile": ["Geist"],
+                        "caption": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "body-md": ["Geist"]
+                    },
+                    "fontSize": {
+                        "display": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.04em", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "500" }],
+                        "headline-md": ["20px", { "lineHeight": "1.4", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+                        "label-mono": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "500" }],
+                        "caption": ["12px", { "lineHeight": "1.4", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "letterSpacing": "0", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #090909; color: #e4e2e2; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .fill-icon { font-variation-settings: 'FILL' 1; }
+        
+        /* Custom scrollbar for technical feel */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #090909; }
+        ::-webkit-scrollbar-thumb { background: #27272A; }
+        ::-webkit-scrollbar-thumb:hover { background: #3F3F46; }
+        
+        /* Minimalist Table Styles */
+        .table-row { border-bottom: 1px solid #27272A; transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1); }
+        .table-row:hover { background-color: #18181B; }
+        .table-header { border-bottom: 1px solid #27272A; }
+    </style>
+</head>
+<body class="bg-background dark:bg-background font-body-md text-body-md text-on-surface antialiased overflow-hidden w-full h-screen">
+<!-- Top NavBar -->
+<nav class="fixed top-0 left-0 w-full h-16 flex items-center justify-between px-margin-page bg-background dark:bg-background border-b border-outline-variant dark:border-outline-variant z-50">
+<!-- Brand -->
+<div class="flex items-center gap-stack-sm">
+<div class="h-8 w-8 rounded bg-surface-container-high flex items-center justify-center flex-shrink-0 overflow-hidden border border-outline-variant">
+<img alt="User Terminal Profile" class="w-full h-full object-cover" data-alt="A macro photograph of a silicon wafer glowing with faint green circuitry patterns in a dark environment. High contrast, sharp details, emphasizing precision and data processing. Modern, technical, minimalist aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcEUWWxTbLovbN6mh4Sz79IHP1HwtfG4sr_yWH57cfy5aqDDFCXVS9NLVEI20d60KgjBpYIDdB_JpYfjtACquQcf5Y1-RBEq44tYshDUIsy02ccAyYL9O_pqbNS0utNpdiYsytmZjclBR5X6ZxNXLtXWJTA4jkH0VEtweQKiGF5kEELA9JPYaw96BUsfdSvmTd8BDRGNaeIH2CyXBcVxdxYGu7pdrmIBRHmtrXV7rxs-qB5JQ7ukD9r47gGMP3bvg4J7Si7LDjySwX">
+</div>
+<div class="hidden md:flex flex-col justify-center whitespace-nowrap">
+<h1 class="font-headline-md text-body-lg font-bold tracking-tighter text-on-surface dark:text-on-surface leading-none mb-1">LeadIntel</h1>
+<p class="font-label-mono text-[10px] text-on-surface-variant dark:text-on-surface-variant uppercase tracking-widest opacity-70 leading-none">Terminal v1.0</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<div class="hidden lg:flex items-center gap-2">
+<a class="flex items-center px-4 py-2 gap-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest transition-colors duration-150 rounded-DEFAULT group" href="#">
+<span class="material-symbols-outlined text-[18px] group-hover:text-on-surface transition-colors duration-150">search</span>
+<span class="font-label-mono text-label-mono uppercase tracking-wider group-hover:text-on-surface transition-colors duration-150">Search</span>
+</a>
+<a class="flex items-center px-4 py-2 gap-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest transition-colors duration-150 rounded-DEFAULT group" href="#">
+<span class="material-symbols-outlined text-[18px] group-hover:text-on-surface transition-colors duration-150">radar</span>
+<span class="font-label-mono text-label-mono uppercase tracking-wider group-hover:text-on-surface transition-colors duration-150">Intelligence</span>
+</a>
+<a class="flex items-center px-4 py-2 gap-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest transition-colors duration-150 rounded-DEFAULT group" href="#">
+<span class="material-symbols-outlined text-[18px] group-hover:text-on-surface transition-colors duration-150">stream</span>
+<span class="font-label-mono text-label-mono uppercase tracking-wider group-hover:text-on-surface transition-colors duration-150">Results</span>
+</a>
+<a class="flex items-center px-4 py-2 gap-2 text-primary dark:text-primary bg-surface-container-low dark:bg-surface-container-low border border-outline-variant/30 rounded-DEFAULT transition-all duration-150" href="#">
+<span class="material-symbols-outlined text-[18px] fill-icon">folder_shared</span>
+<span class="font-label-mono text-label-mono uppercase tracking-wider font-bold">Repository</span>
+</a>
+</div>
+<!-- Actions -->
+<div class="flex items-center gap-stack-sm">
+<button class="bg-on-surface text-background font-label-mono text-label-mono uppercase tracking-widest py-2 px-4 rounded-DEFAULT hover:opacity-90 transition-opacity duration-150 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[16px]">add</span>
+<span class="hidden md:inline">New Scan</span>
+</button>
+<div class="h-6 w-px bg-outline-variant mx-2 hidden md:block"></div>
+<button class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors duration-150 h-8 w-8 flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">notifications_none</span>
+</button>
+<button class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors duration-150 h-8 w-8 flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">terminal</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-surface-container border border-outline-variant overflow-hidden ml-2 hidden md:block">
+<img alt="Admin Avatar" class="w-full h-full object-cover" data-alt="A sleek, minimalist avatar image featuring a dark metallic surface with a subtle geometric pattern etched into it. Illuminated by a single, soft overhead light creating a sense of depth and professionalism. High contrast, sharp focus, monochrome palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD81RQV6xADJcA8HZDe4iOIrVGkzzKz3kXA5ZlRcIP1yaNs9-oeFc_XPN7rtecBSb68hhVzM-lOzW3JP8xUVqCdnc23gWA8kF0x1ihcUxWRYJHDvL8Ijvyaxb8kZ10q6h1Dr6F7mEu8DdcDmktf0f2RmNLjt3648f30blx2zJvkxcS4YFofRZOz-vfqZgp9q9_KDsX8-SvTOL6MszFK8J5mn48TMEcEYvDT_Wv_xJfrjUP6ghR2k1I8lmH7vXWdO1mr7--Q88JIFpBx">
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="w-full h-full pt-16 flex flex-col overflow-hidden bg-[#090909]">
+<!-- Canvas -->
+<div class="flex-1 overflow-y-auto p-margin-page w-full max-w-container-max mx-auto">
+<!-- Repository Header & Controls -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-stack-lg gap-stack-md">
+<div>
+<h2 class="font-display text-display text-on-surface tracking-tighter mb-2">Repository</h2>
+<p class="font-label-mono text-label-mono text-on-surface-variant uppercase tracking-widest opacity-70">Saved Entities // 142 Records</p>
+</div>
+<div class="flex items-center gap-stack-sm w-full md:w-auto">
+<div class="relative w-full md:w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant">search</span>
+<input class="w-full bg-transparent border border-outline-variant rounded-DEFAULT py-2 pl-9 pr-3 text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant focus:border-on-surface focus:ring-0 focus:outline-none transition-colors duration-150" placeholder="Filter records..." type="text">
+</div>
+<button class="border border-outline-variant bg-transparent text-on-surface hover:border-on-surface px-3 py-2 rounded-DEFAULT transition-colors duration-150 flex items-center gap-2 font-label-mono text-label-mono">
+<span class="material-symbols-outlined text-[18px]">filter_list</span>
+<span class="hidden md:inline">Sort</span>
+</button>
+<button class="border border-outline-variant bg-transparent text-on-surface hover:border-on-surface px-3 py-2 rounded-DEFAULT transition-colors duration-150 flex items-center gap-2 font-label-mono text-label-mono">
+<span class="material-symbols-outlined text-[18px]">download</span>
+</button>
+</div>
+</div>
+<!-- Repository List (Table Pattern) -->
+<div class="w-full border border-outline-variant rounded-DEFAULT overflow-hidden bg-[#090909]">
+<!-- Table Header -->
+<div class="table-header grid grid-cols-12 gap-gutter px-gutter py-4 bg-surface-container-lowest">
+<div class="col-span-4 md:col-span-3 font-label-mono text-label-mono text-[#A1A1AA] uppercase tracking-widest">Entity Name</div>
+<div class="col-span-4 md:col-span-3 font-label-mono text-label-mono text-[#A1A1AA] uppercase tracking-widest">Sector</div>
+<div class="hidden md:block col-span-3 font-label-mono text-label-mono text-[#A1A1AA] uppercase tracking-widest">Intelligence Score</div>
+<div class="col-span-4 md:col-span-2 font-label-mono text-label-mono text-[#A1A1AA] uppercase tracking-widest text-right md:text-left">Status</div>
+<div class="hidden md:block col-span-1 text-right"></div>
+</div>
+<!-- List Items -->
+<div class="flex flex-col">
+<!-- Item 1 -->
+<div class="table-row grid grid-cols-12 gap-gutter px-gutter py-4 items-center group cursor-pointer">
+<div class="col-span-4 md:col-span-3 flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-[#18181B] border border-[#27272A] flex items-center justify-center flex-shrink-0">
+<span class="font-label-mono text-label-mono text-on-surface font-bold">AQ</span>
+</div>
+<span class="font-headline-md text-headline-md text-on-surface truncate">Aura Quantum</span>
+</div>
+<div class="col-span-4 md:col-span-3 flex items-center">
+<span class="inline-block px-2 py-1 bg-[#18181B] border border-[#27272A] rounded-[2px] font-label-mono text-label-mono text-[#A1A1AA] uppercase tracking-wider">Deep Tech</span>
+</div>
+<div class="hidden md:flex col-span-3 items-center gap-2">
+<div class="h-1 w-24 bg-[#27272A] rounded-full overflow-hidden">
+<div class="h-full bg-on-surface w-[92%]"></div>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface">0.92</span>
+</div>
+<div class="col-span-4 md:col-span-2 flex items-center justify-end md:justify-start gap-2">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+<span class="font-label-mono text-label-mono text-[#A1A1AA]">Active</span>
+</div>
+<div class="hidden md:flex col-span-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-on-surface">chevron_right</span>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="table-row grid grid-cols-12 gap-gutter px-gutter py-4 items-center group cursor-pointer">
+<div class="col-span-4 md:col-span-3 flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-[#18181B] border border-[#27272A] flex items-center justify-center flex-shrink-0">
+<span class="font-label-mono text-label-mono text-on-surface font-bold">VX</span>
+</div>
+<span class="font-headline-md text-headline-md text-on-surface truncate">Vortex Dynamics</span>
+</div>
+<div class="col-span-4 md:col-span-3 flex items-center">
+<span class="inline-block px-2 py-1 bg-[#18181B] border border-[#27272A] rounded-[2px] font-label-mono text-label-mono text-[#A1A1AA] uppercase tracking-wider">Logistics</span>
+</div>
+<div class="hidden md:flex col-span-3 items-center gap-2">
+<div class="h-1 w-24 bg-[#27272A] rounded-full overflow-hidden">
+<div class="h-full bg-on-surface w-[85%]"></div>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface">0.85</span>
+</div>
+<div class="col-span-4 md:col-span-2 flex items-center justify-end md:justify-start gap-2">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+<span class="font-label-mono text-label-mono text-[#A1A1AA]">Active</span>
+</div>
+<div class="hidden md:flex col-span-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-on-surface">chevron_right</span>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="table-row grid grid-cols-12 gap-gutter px-gutter py-4 items-center group cursor-pointer">
+<div class="col-span-4 md:col-span-3 flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-[#18181B] border border-[#27272A] flex items-center justify-center flex-shrink-0">
+<span class="font-label-mono text-label-mono text-on-surface font-bold">NX</span>
+</div>
+<span class="font-headline-md text-headline-md text-on-surface truncate">Nexo Robotics</span>
+</div>
+<div class="col-span-4 md:col-span-3 flex items-center">
+<span class="inline-block px-2 py-1 bg-[#18181B] border border-[#27272A] rounded-[2px] font-label-mono text-label-mono text-[#A1A1AA] uppercase tracking-wider">Automation</span>
+</div>
+<div class="hidden md:flex col-span-3 items-center gap-2">
+<div class="h-1 w-24 bg-[#27272A] rounded-full overflow-hidden">
+<div class="h-full bg-on-surface-variant w-[78%]"></div>
+</div>
+<span class="font-label-mono text-label-mono text-[#A1A1AA]">0.78</span>
+</div>
+<div class="col-span-4 md:col-span-2 flex items-center justify-end md:justify-start gap-2">
+<div class="w-2 h-2 rounded-full bg-surface-variant"></div>
+<span class="font-label-mono text-label-mono text-[#A1A1AA]">Archived</span>
+</div>
+<div class="hidden md:flex col-span-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-on-surface">chevron_right</span>
+</div>
+</div>
+<!-- Item 4 -->
+<div class="table-row grid grid-cols-12 gap-gutter px-gutter py-4 items-center group cursor-pointer border-b-0">
+<div class="col-span-4 md:col-span-3 flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-[#18181B] border border-[#27272A] flex items-center justify-center flex-shrink-0">
+<span class="font-label-mono text-label-mono text-on-surface font-bold">SL</span>
+</div>
+<span class="font-headline-md text-headline-md text-on-surface truncate">Synapse Labs</span>
+</div>
+<div class="col-span-4 md:col-span-3 flex items-center">
+<span class="inline-block px-2 py-1 bg-[#18181B] border border-[#27272A] rounded-[2px] font-label-mono text-label-mono text-[#A1A1AA] uppercase tracking-wider">Biotech</span>
+</div>
+<div class="hidden md:flex col-span-3 items-center gap-2">
+<div class="h-1 w-24 bg-[#27272A] rounded-full overflow-hidden">
+<div class="h-full bg-on-surface w-[88%]"></div>
+</div>
+<span class="font-label-mono text-label-mono text-on-surface">0.88</span>
+</div>
+<div class="col-span-4 md:col-span-2 flex items-center justify-end md:justify-start gap-2">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+<span class="font-label-mono text-label-mono text-[#A1A1AA]">Active</span>
+</div>
+<div class="hidden md:flex col-span-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-on-surface">chevron_right</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Pagination Minimalist -->
+<div class="mt-stack-md flex justify-between items-center px-4">
+<span class="font-label-mono text-label-mono text-[#A1A1AA] uppercase tracking-widest">Showing 1-4 of 142</span>
+<div class="flex gap-2">
+<button class="w-8 h-8 flex items-center justify-center border border-[#27272A] text-[#A1A1AA] hover:text-on-surface hover:border-on-surface transition-colors duration-150 rounded-[2px]">
+<span class="material-symbols-outlined text-[16px]">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center border border-[#27272A] text-[#A1A1AA] hover:text-on-surface hover:border-on-surface transition-colors duration-150 rounded-[2px]">
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<script>
+        // Simple JS for hover states that might need complex logic later, currently mostly handled by CSS
+        document.querySelectorAll('.table-row').forEach(row => {
+            row.addEventListener('mouseenter', () => {
+                // Potential future interaction logic
+            });
+        });
+    </script>
+</body></html>

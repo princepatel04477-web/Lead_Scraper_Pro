@@ -1,0 +1,207 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>LeadIntel Terminal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-surface": "#e4e2e2",
+                        "surface-container-low": "#1b1c1c",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "surface-container": "#1f2020",
+                        "surface-container-lowest": "#0d0e0e",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#303031",
+                        "outline-variant": "#444748",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "secondary": "#c6c6c7",
+                        "surface-tint": "#c9c6c5",
+                        "on-surface-variant": "#c4c7c7",
+                        "on-primary-fixed": "#1c1b1b",
+                        "primary-fixed": "#e5e2e1",
+                        "on-tertiary-container": "#008a5f",
+                        "on-primary-container": "#7a7978",
+                        "tertiary": "#4edea3",
+                        "surface-variant": "#343535",
+                        "on-secondary-fixed": "#1a1c1c",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e4e2e2",
+                        "on-tertiary": "#003824",
+                        "surface-container-highest": "#343535",
+                        "outline": "#8e9192",
+                        "primary-container": "#090909",
+                        "surface-bright": "#393939",
+                        "on-secondary": "#2f3131",
+                        "error-container": "#93000a",
+                        "surface-dim": "#131314",
+                        "background": "#131314",
+                        "primary": "#c9c6c5",
+                        "secondary-container": "#454747",
+                        "on-surface": "#e4e2e2",
+                        "secondary-fixed-dim": "#c6c6c7",
+                        "tertiary-fixed": "#6ffbbe",
+                        "error": "#ffb4ab",
+                        "secondary-fixed": "#e2e2e2",
+                        "surface-container-high": "#292a2a",
+                        "on-primary-fixed-variant": "#474646",
+                        "on-secondary-container": "#b4b5b5",
+                        "on-primary": "#313030",
+                        "surface": "#131314",
+                        "on-tertiary-fixed": "#002113",
+                        "inverse-primary": "#5f5e5e",
+                        "tertiary-container": "#000c05",
+                        "primary-fixed-dim": "#c9c6c5",
+                        "on-secondary-fixed-variant": "#454747"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-max": "1440px",
+                        "margin-page": "40px",
+                        "stack-sm": "8px",
+                        "unit": "4px",
+                        "stack-md": "16px",
+                        "stack-lg": "32px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "display": ["Geist"],
+                        "headline-lg": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "label-mono": ["JetBrains Mono"],
+                        "headline-lg-mobile": ["Geist"],
+                        "caption": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "body-md": ["Geist"]
+                    },
+                    "fontSize": {
+                        "display": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.04em", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "500" }],
+                        "headline-md": ["20px", { "lineHeight": "1.4", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+                        "label-mono": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "500" }],
+                        "caption": ["12px", { "lineHeight": "1.4", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "letterSpacing": "0", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #090909; }
+        .fade-in-up {
+            animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            opacity: 0;
+            transform: translateY(16px);
+        }
+        .delay-100 { animation-delay: 100ms; }
+        .delay-200 { animation-delay: 200ms; }
+        .delay-300 { animation-delay: 300ms; }
+        
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body class="text-on-surface flex flex-col h-screen overflow-hidden bg-[#090909]">
+<!-- Horizontal TopAppBar -->
+<header class="flex items-center justify-between w-full px-margin-page h-16 bg-background dark:bg-background border-b border-outline-variant dark:border-outline-variant z-50 shrink-0">
+<div class="flex items-center gap-4">
+<h1 class="font-headline-md text-headline-md font-bold tracking-tighter text-on-surface dark:text-on-surface">LeadIntel</h1>
+<span class="font-label-mono text-label-mono text-on-surface-variant">Terminal v1.0</span>
+</div>
+<nav class="hidden md:flex items-center gap-2 h-full">
+<a class="flex items-center px-4 h-full gap-2 text-primary dark:text-primary border-b-2 border-primary bg-surface-container-low dark:bg-surface-container-low opacity-80 transition-all duration-150" href="#">
+<span class="material-symbols-outlined text-[18px]">search</span>
+<span class="font-label-mono text-label-mono">Search</span>
+</a>
+<a class="flex items-center px-4 h-full gap-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest dark:hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[18px]">radar</span>
+<span class="font-label-mono text-label-mono">Intelligence</span>
+</a>
+<a class="flex items-center px-4 h-full gap-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest dark:hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[18px]">stream</span>
+<span class="font-label-mono text-label-mono">Results</span>
+</a>
+<a class="flex items-center px-4 h-full gap-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest dark:hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[18px]">folder_shared</span>
+<span class="font-label-mono text-label-mono">Repository</span>
+</a>
+</nav>
+<div class="flex gap-4 items-center h-full">
+<button class="hidden md:flex px-4 py-1.5 bg-primary-container text-on-surface font-label-mono text-label-mono border border-outline-variant hover:border-on-surface transition-colors duration-150 rounded items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">add</span>
+            New Scan
+        </button>
+<div class="w-px h-6 bg-outline-variant hidden md:block mx-2"></div>
+<button class="text-on-surface-variant hover:text-primary transition-colors duration-150">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors duration-150">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<div class="flex items-center gap-2 ml-2">
+<img class="w-8 h-8 rounded-full border border-outline-variant object-cover" data-alt="A small, circular avatar image of a user profile in a high-tech interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxqbLD4GZS6uYII_Zmxv05gQ62ZtG0auS1QweTxy7c_4YYUimeQ64I__wd6MO44uCeL6xA-HFBbmgaF1MlimqKpfBpv_s7OHVDFi8y_7afhXqKN6bg-oJBPYlrNHV6JybM3rg2Cd2Fq1dvENpkKCQfzS05HT1hJd6dm9q3tUbqj66drjcW9FBgbNwQ7ti3qltkPyHkeqYUP7CS_iyF1pMVo2pU32_WMHXc98QJCq1VhEHy0eZKk83vnwNp7XvOzx6gss1CaYJWebfC">
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col relative w-full h-full bg-[#090909]">
+<!-- Centered Search Workspace -->
+<main class="flex-1 flex items-center justify-center p-margin-page relative overflow-y-auto">
+<div class="w-full max-w-3xl flex flex-col gap-stack-lg z-10">
+<div class="text-center fade-in-up">
+<h2 class="font-display text-display text-on-surface mb-stack-md">Find businesses before everyone else.</h2>
+<p class="font-label-mono text-label-mono text-on-surface-variant tracking-widest uppercase">System Ready // Awaiting Input</p>
+</div>
+<div class="bg-primary-container border border-outline-variant p-stack-lg flex flex-col gap-stack-md fade-in-up delay-100">
+<div class="flex flex-col md:flex-row gap-stack-md">
+<div class="flex-1 flex flex-col gap-unit">
+<label class="font-label-mono text-label-mono text-on-surface-variant uppercase">Niche</label>
+<input class="w-full bg-transparent border-b border-outline-variant border-x-0 border-t-0 focus:ring-0 focus:border-on-surface text-on-surface font-body-md text-body-md placeholder:text-[#3F3F46] py-2 transition-colors duration-150" placeholder="e.g. AI Startups, Real Estate" type="text">
+</div>
+<div class="flex-1 flex flex-col gap-unit">
+<label class="font-label-mono text-label-mono text-on-surface-variant uppercase">City</label>
+<input class="w-full bg-transparent border-b border-outline-variant border-x-0 border-t-0 focus:ring-0 focus:border-on-surface text-on-surface font-body-md text-body-md placeholder:text-[#3F3F46] py-2 transition-colors duration-150" placeholder="e.g. San Francisco" type="text">
+</div>
+<div class="flex-1 flex flex-col gap-unit">
+<label class="font-label-mono text-label-mono text-on-surface-variant uppercase">Country</label>
+<input class="w-full bg-transparent border-b border-outline-variant border-x-0 border-t-0 focus:ring-0 focus:border-on-surface text-on-surface font-body-md text-body-md placeholder:text-[#3F3F46] py-2 transition-colors duration-150" placeholder="e.g. United States" type="text">
+</div>
+</div>
+<div class="flex justify-end mt-stack-sm">
+<button class="bg-on-surface text-primary-container px-6 py-3 font-label-mono text-label-mono uppercase tracking-widest hover:bg-surface-tint transition-colors duration-150 flex items-center gap-2">
+                            Execute Search
+                            <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<div class="flex justify-center gap-stack-md fade-in-up delay-200">
+<span class="inline-flex items-center gap-2 px-3 py-1 bg-[#18181B] border border-[#27272A] rounded-[2px] font-label-mono text-label-mono text-[#A1A1AA]">
+<span class="w-2 h-2 rounded-full bg-tertiary-fixed"></span> Status: Online
+                    </span>
+<span class="inline-flex items-center gap-2 px-3 py-1 bg-[#18181B] border border-[#27272A] rounded-[2px] font-label-mono text-label-mono text-[#A1A1AA]">
+<span class="material-symbols-outlined text-[14px]">database</span> Index: 4.2B Nodes
+                    </span>
+</div>
+</div>
+<!-- Atmospheric background elements -->
+<div class="absolute inset-0 pointer-events-none opacity-20" style="background-image: radial-gradient(circle at 50% 50%, #27272A 1px, transparent 1px); background-size: 24px 24px;"></div>
+</main>
+</div>
+</body></html>

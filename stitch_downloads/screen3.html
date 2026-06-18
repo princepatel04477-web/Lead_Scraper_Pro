@@ -1,0 +1,341 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Search Execution - LeadIntel Terminal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "inverse-surface": "#e4e2e2",
+                        "surface-container-low": "#1b1c1c",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "surface-container": "#1f2020",
+                        "surface-container-lowest": "#0d0e0e",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#303031",
+                        "outline-variant": "#444748",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "secondary": "#c6c6c7",
+                        "surface-tint": "#c9c6c5",
+                        "on-surface-variant": "#c4c7c7",
+                        "on-primary-fixed": "#1c1b1b",
+                        "primary-fixed": "#e5e2e1",
+                        "on-tertiary-container": "#008a5f",
+                        "on-primary-container": "#7a7978",
+                        "tertiary": "#4edea3",
+                        "surface-variant": "#343535",
+                        "on-secondary-fixed": "#1a1c1c",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e4e2e2",
+                        "on-tertiary": "#003824",
+                        "surface-container-highest": "#343535",
+                        "outline": "#8e9192",
+                        "primary-container": "#090909",
+                        "surface-bright": "#393939",
+                        "on-secondary": "#2f3131",
+                        "error-container": "#93000a",
+                        "surface-dim": "#131314",
+                        "background": "#131314",
+                        "primary": "#c9c6c5",
+                        "secondary-container": "#454747",
+                        "on-surface": "#e4e2e2",
+                        "secondary-fixed-dim": "#c6c6c7",
+                        "tertiary-fixed": "#6ffbbe",
+                        "error": "#ffb4ab",
+                        "secondary-fixed": "#e2e2e2",
+                        "surface-container-high": "#292a2a",
+                        "on-primary-fixed-variant": "#474646",
+                        "on-secondary-container": "#b4b5b5",
+                        "on-primary": "#313030",
+                        "surface": "#131314",
+                        "on-tertiary-fixed": "#002113",
+                        "inverse-primary": "#5f5e5e",
+                        "tertiary-container": "#000c05",
+                        "primary-fixed-dim": "#c9c6c5",
+                        "on-secondary-fixed-variant": "#454747"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "container-max": "1440px",
+                        "margin-page": "40px",
+                        "stack-sm": "8px",
+                        "unit": "4px",
+                        "stack-md": "16px",
+                        "stack-lg": "32px",
+                        "gutter": "24px"
+                    },
+                    fontFamily: {
+                        "display": ["Geist"],
+                        "headline-lg": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "label-mono": ["JetBrains Mono"],
+                        "headline-lg-mobile": ["Geist"],
+                        "caption": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "body-md": ["Geist"]
+                    },
+                    fontSize: {
+                        "display": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.04em", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "500" }],
+                        "headline-md": ["20px", { "lineHeight": "1.4", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+                        "label-mono": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "500" }],
+                        "caption": ["12px", { "lineHeight": "1.4", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "letterSpacing": "0", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #090909; color: #e4e2e2; }
+        .hairline-border { border: 1px solid #27272A; }
+        .hairline-border-b { border-bottom: 1px solid #27272A; }
+        .hairline-border-t { border-top: 1px solid #27272A; }
+        
+        @keyframes scan-line {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
+        }
+        .scan-line-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
+            animation: scan-line 4s linear infinite;
+            opacity: 0.3;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        .cursor-blink { animation: blink 1s step-end infinite; }
+        
+        .log-entry { opacity: 0; animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="font-body-md text-body-md antialiased overflow-hidden selection:bg-surface-container-high selection:text-on-surface">
+<div class="scan-line-overlay"></div>
+<!-- Layout Container -->
+<div class="flex flex-col h-screen w-full relative z-20">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-margin-page h-16 border-b border-outline-variant bg-background z-50 shrink-0">
+<div class="flex items-center gap-stack-md">
+<div class="flex items-center gap-stack-sm">
+<span class="material-symbols-outlined text-primary" data-icon="terminal">terminal</span>
+<h1 class="font-headline-md text-headline-md font-bold tracking-tighter text-on-surface">LeadIntel</h1>
+</div>
+<span class="hidden sm:inline-block font-label-mono text-label-mono text-on-surface-variant uppercase border-l border-outline-variant pl-stack-md ml-unit">Terminal v1.0</span>
+</div>
+<div class="hidden md:flex items-center h-full">
+<a class="flex items-center gap-2 px-stack-md h-full text-primary border-b-2 border-primary bg-surface-container-low transition-all duration-150" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="search">search</span>
+<span class="font-label-mono text-label-mono uppercase tracking-widest">Search</span>
+</a>
+<a class="flex items-center gap-2 px-stack-md h-full text-on-surface-variant hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="radar">radar</span>
+<span class="font-label-mono text-label-mono uppercase tracking-widest">Intelligence</span>
+</a>
+<a class="flex items-center gap-2 px-stack-md h-full text-on-surface-variant hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="stream">stream</span>
+<span class="font-label-mono text-label-mono uppercase tracking-widest">Results</span>
+</a>
+<a class="flex items-center gap-2 px-stack-md h-full text-on-surface-variant hover:bg-surface-container-highest transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="folder_shared">folder_shared</span>
+<span class="font-label-mono text-label-mono uppercase tracking-widest">Repository</span>
+</a>
+</div>
+<div class="flex items-center gap-stack-md">
+<button class="hidden sm:flex bg-surface-container-low border border-outline-variant text-on-surface py-1.5 px-3 rounded font-label-mono text-label-mono uppercase hover:bg-surface-container-highest hover:border-on-surface transition-colors duration-150 items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+    New Scan
+</button>
+<div class="flex gap-stack-sm border-l border-outline-variant pl-stack-md ml-unit">
+<a class="text-on-surface-variant hover:text-on-surface transition-colors flex items-center" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="settings">settings</span>
+</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors flex items-center" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="help_outline">help_outline</span>
+</a>
+</div>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="flex-1 flex flex-col relative w-full max-w-container-max mx-auto bg-[#090909] overflow-hidden">
+<!-- Execution UI Canvas -->
+<div class="flex-1 overflow-y-auto p-margin-page md:p-12 lg:p-24 flex flex-col lg:flex-row gap-gutter">
+<!-- Left Column: Status & Counters (Bento Grid Style) -->
+<div class="w-full lg:w-1/3 flex flex-col gap-stack-md">
+<!-- Primary Status Node -->
+<div class="hairline-border bg-surface-container-low p-stack-md flex flex-col justify-between relative overflow-hidden group">
+<div class="absolute inset-0 bg-[#18181B] opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+<div class="relative z-10 flex justify-between items-start mb-stack-lg">
+<div>
+<h2 class="font-label-mono text-label-mono text-on-surface-variant uppercase mb-unit">Execution State</h2>
+<p class="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+<span class="w-2 h-2 bg-tertiary-fixed rounded-full shadow-[0_0_8px_rgba(111,251,190,0.8)]"></span>
+                                    ACTIVE SCAN
+                                </p>
+</div>
+<span class="material-symbols-outlined text-tertiary-fixed" data-icon="radar">radar</span>
+</div>
+<div class="relative z-10">
+<p class="font-label-mono text-label-mono text-on-surface-variant uppercase">Target Vector</p>
+<p class="font-body-md text-on-surface truncate">SaaS + Series A + North America</p>
+</div>
+</div>
+<!-- Counter Nodes Grid -->
+<div class="grid grid-cols-2 gap-stack-md h-full">
+<div class="hairline-border bg-transparent p-stack-md flex flex-col justify-between transition-colors hover:border-on-surface duration-150">
+<span class="material-symbols-outlined text-on-surface-variant mb-stack-md" data-icon="corporate_fare">corporate_fare</span>
+<div>
+<p class="font-display text-display text-on-surface" id="counter-entities">0</p>
+<p class="font-label-mono text-label-mono text-on-surface-variant uppercase mt-unit">Entities Discovered</p>
+</div>
+</div>
+<div class="hairline-border bg-transparent p-stack-md flex flex-col justify-between transition-colors hover:border-on-surface duration-150">
+<span class="material-symbols-outlined text-on-surface-variant mb-stack-md" data-icon="contact_mail">contact_mail</span>
+<div>
+<p class="font-display text-display text-on-surface" id="counter-contacts">0</p>
+<p class="font-label-mono text-label-mono text-on-surface-variant uppercase mt-unit">Contacts Verified</p>
+</div>
+</div>
+<div class="hairline-border bg-transparent p-stack-md flex flex-col justify-between col-span-2 transition-colors hover:border-on-surface duration-150">
+<div class="flex justify-between items-center mb-stack-md">
+<span class="font-label-mono text-label-mono text-on-surface-variant uppercase">Network Latency</span>
+<span class="font-label-mono text-label-mono text-primary" id="latency-ms">24ms</span>
+</div>
+<!-- Minimalist dynamic 'graph' via inline styles -->
+<div class="h-12 w-full flex items-end gap-1" id="latency-graph">
+<!-- Bars populated by JS -->
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Terminal Log -->
+<div class="w-full lg:w-2/3 hairline-border bg-surface-container-lowest p-stack-md flex flex-col min-h-[512px] relative overflow-hidden">
+<div class="flex justify-between items-center mb-stack-md pb-stack-sm hairline-border-b">
+<span class="font-label-mono text-label-mono text-on-surface-variant uppercase tracking-widest">Execution Log_</span>
+<div class="flex gap-2">
+<div class="w-1.5 h-1.5 bg-outline-variant rounded-full"></div>
+<div class="w-1.5 h-1.5 bg-outline-variant rounded-full"></div>
+<div class="w-1.5 h-1.5 bg-outline-variant rounded-full"></div>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto font-label-mono text-label-mono pr-2" id="terminal-log">
+<!-- Initial Log -->
+<div class="flex gap-4 py-1 text-on-surface-variant">
+<span class="opacity-50">[00:00.00]</span>
+<span>System initialized. Establishing connection to intelligence nodes...</span>
+</div>
+</div>
+<div class="mt-stack-sm pt-stack-sm hairline-border-t flex items-center gap-2 font-label-mono text-label-mono text-on-surface">
+<span class="text-tertiary-fixed">&gt;</span>
+<span class="truncate" id="current-action">Awaiting data stream...</span>
+<span class="cursor-blink bg-on-surface w-2 h-4 inline-block align-middle"></span>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Logic for dynamic updates -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const entitiesEl = document.getElementById('counter-entities');
+            const contactsEl = document.getElementById('counter-contacts');
+            const latencyEl = document.getElementById('latency-ms');
+            const logContainer = document.getElementById('terminal-log');
+            const currentActionEl = document.getElementById('current-action');
+            const graphContainer = document.getElementById('latency-graph');
+            
+            let entities = 0;
+            let contacts = 0;
+            let startTime = Date.now();
+
+            // Initialize latency graph bars
+            for(let i=0; i<30; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'w-full bg-outline-variant transition-all duration-150';
+                bar.style.height = `${Math.random() * 40 + 10}%`;
+                graphContainer.appendChild(bar);
+            }
+
+            const logMessages = [
+                "Scanning business directories...",
+                "Querying public registries...",
+                "Extracting metadata from target domain...",
+                "Resolving IP to corporate entity...",
+                "Verifying SSL certificates...",
+                "Cross-referencing employee databases...",
+                "Bypassing generic contact filters...",
+                "Analyzing social graph connections..."
+            ];
+
+            function formatTime() {
+                const elapsed = Date.now() - startTime;
+                const secs = Math.floor(elapsed / 1000);
+                const ms = Math.floor((elapsed % 1000) / 10);
+                return `[00:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}]`;
+            }
+
+            function addLog(message, isSuccess = false) {
+                const entry = document.createElement('div');
+                entry.className = `flex gap-4 py-1 log-entry ${isSuccess ? 'text-primary' : 'text-on-surface-variant'}`;
+                entry.innerHTML = `<span class="opacity-50">${formatTime()}</span> <span>${message}</span>`;
+                logContainer.appendChild(entry);
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+
+            // Update Counters randomly to feel alive
+            setInterval(() => {
+                if(Math.random() > 0.3) {
+                    entities += Math.floor(Math.random() * 3) + 1;
+                    entitiesEl.innerText = entities.toLocaleString();
+                    if(entities % 15 === 0) addLog(`Batch processed: ${entities} entities indexed.`, true);
+                }
+            }, 800);
+
+            setInterval(() => {
+                if(Math.random() > 0.6) {
+                    contacts += Math.floor(Math.random() * 2) + 1;
+                    contactsEl.innerText = contacts.toLocaleString();
+                }
+            }, 1200);
+
+            // Update Log & Current Action
+            setInterval(() => {
+                const action = logMessages[Math.floor(Math.random() * logMessages.length)];
+                currentActionEl.innerText = action;
+                if(Math.random() > 0.4) {
+                    addLog(action);
+                }
+            }, 2500);
+
+            // Animate Latency Graph
+            setInterval(() => {
+                const bars = graphContainer.children;
+                for(let i=0; i<bars.length-1; i++) {
+                    bars[i].style.height = bars[i+1].style.height;
+                }
+                const newHeight = Math.random() * 80 + 20;
+                bars[bars.length-1].style.height = `${newHeight}%`;
+                latencyEl.innerText = `${Math.floor(newHeight / 2) + 10}ms`;
+            }, 150);
+        });
+    </script>
+</body></html>

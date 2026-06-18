@@ -1,0 +1,402 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>LeadIntel - Results Stream</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-surface": "#e4e2e2",
+                        "surface-container-low": "#1b1c1c",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "surface-container": "#1f2020",
+                        "surface-container-lowest": "#0d0e0e",
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#303031",
+                        "outline-variant": "#444748",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "secondary": "#c6c6c7",
+                        "surface-tint": "#c9c6c5",
+                        "on-surface-variant": "#c4c7c7",
+                        "on-primary-fixed": "#1c1b1b",
+                        "primary-fixed": "#e5e2e1",
+                        "on-tertiary-container": "#008a5f",
+                        "on-primary-container": "#7a7978",
+                        "tertiary": "#4edea3",
+                        "surface-variant": "#343535",
+                        "on-secondary-fixed": "#1a1c1c",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e4e2e2",
+                        "on-tertiary": "#003824",
+                        "surface-container-highest": "#343535",
+                        "outline": "#8e9192",
+                        "primary-container": "#090909",
+                        "surface-bright": "#393939",
+                        "on-secondary": "#2f3131",
+                        "error-container": "#93000a",
+                        "surface-dim": "#131314",
+                        "background": "#131314",
+                        "primary": "#c9c6c5",
+                        "secondary-container": "#454747",
+                        "on-surface": "#e4e2e2",
+                        "secondary-fixed-dim": "#c6c6c7",
+                        "tertiary-fixed": "#6ffbbe",
+                        "error": "#ffb4ab",
+                        "secondary-fixed": "#e2e2e2",
+                        "surface-container-high": "#292a2a",
+                        "on-primary-fixed-variant": "#474646",
+                        "on-secondary-container": "#b4b5b5",
+                        "on-primary": "#313030",
+                        "surface": "#131314",
+                        "on-tertiary-fixed": "#002113",
+                        "inverse-primary": "#5f5e5e",
+                        "tertiary-container": "#000c05",
+                        "primary-fixed-dim": "#c9c6c5",
+                        "on-secondary-fixed-variant": "#454747"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-max": "1440px",
+                        "margin-page": "40px",
+                        "stack-sm": "8px",
+                        "unit": "4px",
+                        "stack-md": "16px",
+                        "stack-lg": "32px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "display": ["Geist"],
+                        "headline-lg": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "label-mono": ["JetBrains Mono"],
+                        "headline-lg-mobile": ["Geist"],
+                        "caption": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "body-md": ["Geist"]
+                    },
+                    "fontSize": {
+                        "display": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.04em", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "500" }],
+                        "headline-md": ["20px", { "lineHeight": "1.4", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+                        "label-mono": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "500" }],
+                        "caption": ["12px", { "lineHeight": "1.4", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "letterSpacing": "0", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "letterSpacing": "0", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #090909; /* Level 0 Base */
+            color: #e4e2e2;
+        }
+        
+        /* Smooth, non-bouncy transitions */
+        .transition-mechanical {
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 150ms;
+        }
+
+        /* Lead row styling */
+        .lead-row {
+            border-bottom: 1px solid #27272A; /* Hairline separator */
+            opacity: 0;
+            transform: translateY(4px);
+            animation: slideUpFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        .lead-row:hover {
+            background-color: #18181B;
+        }
+
+        @keyframes slideUpFadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Staggered animation delays for the initial list */
+        .lead-row:nth-child(1) { animation-delay: 0.05s; }
+        .lead-row:nth-child(2) { animation-delay: 0.10s; }
+        .lead-row:nth-child(3) { animation-delay: 0.15s; }
+        .lead-row:nth-child(4) { animation-delay: 0.20s; }
+        .lead-row:nth-child(5) { animation-delay: 0.25s; }
+        .lead-row:nth-child(6) { animation-delay: 0.30s; }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col font-body-md text-body-md pt-16">
+<!-- TopAppBar (Web) -->
+<nav class="hidden md:flex items-center justify-between w-full h-16 bg-background dark:bg-background border-b border-outline-variant dark:border-outline-variant fixed top-0 left-0 z-50 px-gutter">
+<!-- Left: Brand -->
+<div class="flex items-center gap-stack-sm">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden">
+<img alt="User Terminal Profile" class="w-full h-full object-cover" data-alt="A minimalist, highly stylized abstract geometric representation of a user profile avatar. Rendered in strict monochrome dark mode aesthetic, featuring deep blacks, grays, and stark white highlights. The design should evoke a high-tech, precise, and professional terminal interface environment, void of any organic or playful elements." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAxGDfkwB9sd3g3cjGYAclQ-h51ULE7TcRc1P4ZOR8DUU9KenrwTgg-INrZDSZXtKF3IaORc5T2wPmZmz5EMgv9NK7zjwswhcRRMOFKgGp0n0Qee2f6irpZQ-SfiPCEHR_zrg1w7U9aUjAZHSC0pluSiDFig4uc4DPBgFdpChZA_JFGIR2CsNzD4kmNYwlHwN_f_qNyzdZvwgEj26dostN431QQF_6V-_kuRNecf05KlIVNW1XgoKCduQsro1CiTxIW5nN1LCLB6zzW">
+</div>
+<div class="flex items-baseline gap-2">
+<h1 class="font-headline-md text-headline-md font-bold tracking-tighter text-on-surface dark:text-on-surface">LeadIntel</h1>
+<span class="font-label-mono text-[10px] text-on-surface-variant dark:text-on-surface-variant">Terminal v1.0</span>
+</div>
+</div>
+<!-- Center: Links -->
+<div class="flex items-center h-full">
+<a class="flex items-center gap-2 h-full px-4 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest dark:hover:bg-surface-container-highest transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[18px] transition-mechanical group-hover:text-primary">search</span>
+<span class="font-label-mono text-label-mono">Search</span>
+</a>
+<a class="flex items-center gap-2 h-full px-4 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest dark:hover:bg-surface-container-highest transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[18px] transition-mechanical group-hover:text-primary">radar</span>
+<span class="font-label-mono text-label-mono">Intelligence</span>
+</a>
+<a class="flex items-center gap-2 h-full px-4 text-primary dark:text-primary border-b-2 border-primary bg-surface-container-low dark:bg-surface-container-low transition-all duration-150 group" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">stream</span>
+<span class="font-label-mono text-label-mono">Results</span>
+</a>
+<a class="flex items-center gap-2 h-full px-4 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-highest dark:hover:bg-surface-container-highest transition-colors duration-150 group" href="#">
+<span class="material-symbols-outlined text-[18px] transition-mechanical group-hover:text-primary">folder_shared</span>
+<span class="font-label-mono text-label-mono">Repository</span>
+</a>
+</div>
+<!-- Right: Actions -->
+<div class="flex items-center gap-stack-md">
+<button class="px-4 py-1.5 bg-primary-fixed text-primary-container font-label-mono text-label-mono rounded transition-mechanical hover:opacity-90">
+                New Scan
+            </button>
+<button class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors duration-150 p-1 rounded hover:bg-surface-container-highest">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+</button>
+<button class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors duration-150 p-1 rounded hover:bg-surface-container-highest">
+<span class="material-symbols-outlined text-[20px]">help_outline</span>
+</button>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col w-full max-w-container-max mx-auto">
+<!-- TopAppBar (Mobile) -->
+<header class="docked top w-full bg-background dark:bg-background border-b border-outline-variant dark:border-outline-variant flex justify-between items-center px-margin-page h-16 z-40 sticky top-0 md:hidden">
+<div class="font-label-mono text-label-mono uppercase tracking-widest text-on-surface dark:text-on-surface">
+                LeadIntel Terminal
+            </div>
+<div class="flex items-center gap-stack-md">
+<button class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors duration-150">
+<span class="material-symbols-outlined">notifications_none</span>
+</button>
+<button class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors duration-150">
+<span class="material-symbols-outlined">terminal</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden ml-stack-sm">
+<img alt="Admin Avatar" class="w-full h-full object-cover" data-alt="A minimalist, highly stylized abstract geometric representation of an admin profile avatar. Rendered in strict monochrome dark mode aesthetic, featuring deep blacks, grays, and stark white highlights. The design should evoke a high-tech, precise, and professional terminal interface environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAJGV0tCzNe2_QZ3HSi-1GtUIAxpHnffhCEMxBuHIbsHq1jJWmIp8evn6gwfNPAmcLy77dD5AzkTruMe_oHZj-ItM9NBlBG9tChPB-0tRg04V9_ZcGRyTupl3AKYqDqVsTGNydernDuh3DTOaV31isKOkfyFtE5jH7flozcNdLIKNz-XDDRXIcnNrReVzJkwg4MFHS1czmdLp3Z34xINxS4DvVb7gpmMB9jzHgbsLAnR1BS9uruuWrdSpvesxvqjkXxMWYESyuHk6Yg">
+</div>
+</div>
+</header>
+<!-- Stream Canvas -->
+<div class="flex-1 p-margin-page w-full flex flex-col gap-stack-lg">
+<!-- Stream Header -->
+<div class="flex justify-between items-end border-b border-outline-variant pb-stack-sm">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Active Stream</h2>
+<p class="font-label-mono text-label-mono text-on-surface-variant mt-unit">Ingesting new records in real-time...</p>
+</div>
+<div class="flex items-center gap-stack-md">
+<span class="flex h-3 w-3 relative">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-fixed opacity-75"></span>
+<span class="relative inline-flex rounded-full h-3 w-3 bg-primary-fixed"></span>
+</span>
+<span class="font-label-mono text-label-mono text-primary">LIVE</span>
+</div>
+</div>
+<!-- List Header (Table-like structure) -->
+<div class="grid grid-cols-12 gap-gutter px-stack-sm font-label-mono text-label-mono text-[#A1A1AA] pb-stack-sm border-b border-outline-variant">
+<div class="col-span-3">Company</div>
+<div class="col-span-2">Contact</div>
+<div class="col-span-3">Location</div>
+<div class="col-span-2">Digital</div>
+<div class="col-span-2 text-right">Score</div>
+</div>
+<!-- Stream Container -->
+<div class="flex flex-col" id="lead-stream">
+<!-- Lead Row 1 -->
+<div class="lead-row grid grid-cols-12 gap-gutter py-stack-md px-stack-sm items-center transition-mechanical cursor-pointer group">
+<div class="col-span-3 flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface group-hover:text-primary transition-mechanical">Acme Corp</span>
+<span class="font-label-mono text-label-mono text-on-surface-variant mt-unit">Enterprise Software</span>
+</div>
+<div class="col-span-2 flex flex-col gap-unit">
+<span class="text-on-surface">j.doe@acme.io</span>
+<span class="text-on-surface-variant font-label-mono">+1 555-0198</span>
+</div>
+<div class="col-span-3 flex items-center gap-stack-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">location_on</span>
+<span>San Francisco, CA</span>
+</div>
+<div class="col-span-2 flex items-center gap-stack-sm">
+<a class="text-on-surface-variant hover:text-primary transition-mechanical flex items-center gap-unit" href="#"><span class="material-symbols-outlined text-[16px]">language</span>acme.io</a>
+</div>
+<div class="col-span-2 text-right flex flex-col items-end">
+<span class="font-headline-md text-headline-md text-primary">98.4</span>
+<span class="font-label-mono text-label-mono text-on-surface-variant">Signal Strength</span>
+</div>
+</div>
+<!-- Lead Row 2 -->
+<div class="lead-row grid grid-cols-12 gap-gutter py-stack-md px-stack-sm items-center transition-mechanical cursor-pointer group">
+<div class="col-span-3 flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface group-hover:text-primary transition-mechanical">Globex Dynamics</span>
+<span class="font-label-mono text-label-mono text-on-surface-variant mt-unit">Aerospace Logistics</span>
+</div>
+<div class="col-span-2 flex flex-col gap-unit">
+<span class="text-on-surface">s.connor@globex.net</span>
+<span class="text-on-surface-variant font-label-mono">+1 555-0245</span>
+</div>
+<div class="col-span-3 flex items-center gap-stack-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">location_on</span>
+<span>Austin, TX</span>
+</div>
+<div class="col-span-2 flex items-center gap-stack-sm">
+<a class="text-on-surface-variant hover:text-primary transition-mechanical flex items-center gap-unit" href="#"><span class="material-symbols-outlined text-[16px]">language</span>globex.net</a>
+</div>
+<div class="col-span-2 text-right flex flex-col items-end">
+<span class="font-headline-md text-headline-md text-primary">94.1</span>
+<span class="font-label-mono text-label-mono text-on-surface-variant">Signal Strength</span>
+</div>
+</div>
+<!-- Lead Row 3 -->
+<div class="lead-row grid grid-cols-12 gap-gutter py-stack-md px-stack-sm items-center transition-mechanical cursor-pointer group">
+<div class="col-span-3 flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface group-hover:text-primary transition-mechanical">Initech Solutions</span>
+<span class="font-label-mono text-label-mono text-on-surface-variant mt-unit">Fintech Infrastructure</span>
+</div>
+<div class="col-span-2 flex flex-col gap-unit">
+<span class="text-on-surface">m.bolton@initech.co</span>
+<span class="text-on-surface-variant font-label-mono">+1 555-0892</span>
+</div>
+<div class="col-span-3 flex items-center gap-stack-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">location_on</span>
+<span>New York, NY</span>
+</div>
+<div class="col-span-2 flex items-center gap-stack-sm">
+<a class="text-on-surface-variant hover:text-primary transition-mechanical flex items-center gap-unit" href="#"><span class="material-symbols-outlined text-[16px]">language</span>initech.co</a>
+</div>
+<div class="col-span-2 text-right flex flex-col items-end">
+<span class="font-headline-md text-headline-md text-primary">89.7</span>
+<span class="font-label-mono text-label-mono text-on-surface-variant">Signal Strength</span>
+</div>
+</div>
+<!-- Lead Row 4 -->
+<div class="lead-row grid grid-cols-12 gap-gutter py-stack-md px-stack-sm items-center transition-mechanical cursor-pointer group">
+<div class="col-span-3 flex flex-col">
+<span class="font-headline-md text-headline-md text-on-surface group-hover:text-primary transition-mechanical">Soylent Corp</span>
+<span class="font-label-mono text-label-mono text-on-surface-variant mt-unit">AgriTech Analytics</span>
+</div>
+<div class="col-span-2 flex flex-col gap-unit">
+<span class="text-on-surface">r.thorn@soylent.io</span>
+<span class="text-on-surface-variant font-label-mono">+1 555-0112</span>
+</div>
+<div class="col-span-3 flex items-center gap-stack-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">location_on</span>
+<span>Chicago, IL</span>
+</div>
+<div class="col-span-2 flex items-center gap-stack-sm">
+<a class="text-on-surface-variant hover:text-primary transition-mechanical flex items-center gap-unit" href="#"><span class="material-symbols-outlined text-[16px]">language</span>soylent.io</a>
+</div>
+<div class="col-span-2 text-right flex flex-col items-end">
+<span class="font-headline-md text-headline-md text-on-surface-variant">82.3</span>
+<span class="font-label-mono text-label-mono text-on-surface-variant opacity-70">Signal Strength</span>
+</div>
+</div>
+</div>
+<!-- Loading indicator for continuous stream -->
+<div class="flex justify-center py-stack-lg pb-[80px] md:pb-0">
+<span class="font-label-mono text-label-mono text-on-surface-variant animate-pulse">Awaiting incoming signals...</span>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 w-full bg-background dark:bg-background border-t border-outline-variant dark:border-outline-variant z-50 flex justify-around items-center h-16">
+<a class="flex flex-col items-center gap-unit text-on-surface-variant dark:text-on-surface-variant transition-colors duration-150" href="#">
+<span class="material-symbols-outlined">search</span>
+<span class="font-label-mono text-[10px]">Search</span>
+</a>
+<a class="flex flex-col items-center gap-unit text-on-surface-variant dark:text-on-surface-variant transition-colors duration-150" href="#">
+<span class="material-symbols-outlined">radar</span>
+<span class="font-label-mono text-[10px]">Intel</span>
+</a>
+<a class="flex flex-col items-center gap-unit text-primary dark:text-primary transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">stream</span>
+<span class="font-label-mono text-[10px]">Results</span>
+</a>
+<a class="flex flex-col items-center gap-unit text-on-surface-variant dark:text-on-surface-variant transition-colors duration-150" href="#">
+<span class="material-symbols-outlined">folder_shared</span>
+<span class="font-label-mono text-[10px]">Repo</span>
+</a>
+</nav>
+<script>
+        // Simulate real-time streaming of leads
+        document.addEventListener('DOMContentLoaded', () => {
+            const streamContainer = document.getElementById('lead-stream');
+            
+            // Dummy data for new leads
+            const newLeads = [
+                { company: 'Massive Dynamic', industry: 'Biotech Systems', email: 'w.bell@massive.net', phone: '+1 555-0987', location: 'Boston, MA', domain: 'massive.net', score: '91.2' },
+                { company: 'Tyrell Corp', industry: 'Robotics', email: 'e.tyrell@tyrell.co', phone: '+1 555-0456', location: 'Los Angeles, CA', domain: 'tyrell.co', score: '88.5' }
+            ];
+
+            let leadIndex = 0;
+
+            // Function to create and insert a new lead row
+            function insertNewLead() {
+                if (leadIndex >= newLeads.length) return; // Stop if no more leads
+
+                const lead = newLeads[leadIndex];
+                
+                const rowHTML = `
+                    <div class="col-span-3 flex flex-col">
+                        <span class="font-headline-md text-headline-md text-on-surface group-hover:text-primary transition-mechanical">${lead.company}</span>
+                        <span class="font-label-mono text-label-mono text-on-surface-variant mt-unit">${lead.industry}</span>
+                    </div>
+                    <div class="col-span-2 flex flex-col gap-unit">
+                        <span class="text-on-surface">${lead.email}</span>
+                        <span class="text-on-surface-variant font-label-mono">${lead.phone}</span>
+                    </div>
+                    <div class="col-span-3 flex items-center gap-stack-sm text-on-surface-variant">
+                        <span class="material-symbols-outlined text-[16px]">location_on</span>
+                        <span>${lead.location}</span>
+                    </div>
+                    <div class="col-span-2 flex items-center gap-stack-sm">
+                         <a href="#" class="text-on-surface-variant hover:text-primary transition-mechanical flex items-center gap-unit"><span class="material-symbols-outlined text-[16px]">language</span>${lead.domain}</a>
+                    </div>
+                    <div class="col-span-2 text-right flex flex-col items-end">
+                        <span class="font-headline-md text-headline-md text-primary">${lead.score}</span>
+                        <span class="font-label-mono text-label-mono text-on-surface-variant">Signal Strength</span>
+                    </div>
+                `;
+
+                const rowElement = document.createElement('div');
+                rowElement.className = 'lead-row grid grid-cols-12 gap-gutter py-stack-md px-stack-sm items-center transition-mechanical cursor-pointer group';
+                rowElement.innerHTML = rowHTML;
+
+                // Insert at the top of the stream
+                streamContainer.insertBefore(rowElement, streamContainer.firstChild);
+
+                leadIndex++;
+            }
+
+            // Simulate incoming leads every few seconds
+            setInterval(insertNewLead, 4500);
+        });
+    </script>
+</body></html>

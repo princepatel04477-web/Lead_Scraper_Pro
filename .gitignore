@@ -1,1 +1,7 @@
 testsprite_tests/tmp/config.json
+__pycache__/
+*.pyc
+output/*.csv
+output/*.xlsx
+.venv/
+venv/
