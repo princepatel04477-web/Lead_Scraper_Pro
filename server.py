@@ -15,8 +15,11 @@ from pydantic import BaseModel
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from scrapers import GoogleMapsScraper, InstagramScraper, YellowPagesScraper, FacebookScraper
+from scrapers.intelligence_engine import LeadIntelligenceEngine
 from utils.filters import filter_no_website, deduplicate
 from utils.export import export_csv, export_excel
+
+intel_engine = LeadIntelligenceEngine()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("server")
@@ -90,13 +93,27 @@ def add_log(msg: str, is_success: bool = False):
                 pass
 
 def add_lead(lead: dict):
-    with lock:
-        # Calculate a mock signal strength score between 75.0 and 99.9 if not present
-        if "score" not in lead:
-            # Hash name to make it deterministic
-            name_hash = sum(ord(c) for c in lead.get("name", "Unknown"))
-            lead["score"] = round(75.0 + (name_hash % 250) / 10.0, 1)
+    # Calculate deterministic lead quality score (Module 8)
+    score, breakdown = intel_engine.calculate_lead_score(lead)
+    lead["score"] = float(score)
+    lead["score_breakdown"] = breakdown
+    
+    # Enrich the Company Knowledge Graph (Module 9)
+    try:
+        intel_engine.enrich_company_graph(lead)
+    except Exception as e:
+        logger.debug(f"Failed to enrich graph for {lead.get('name')}: {e}")
         
+    # Asynchronously discover keywords from company website (Module 2)
+    if lead.get("website"):
+        import threading
+        threading.Thread(
+            target=intel_engine.discover_keywords_from_url,
+            args=(lead["name"], lead["website"]),
+            daemon=True
+        ).start()
+        
+    with lock:
         active_scan["leads"].append(lead)
         active_scan["entities_discovered"] = len(active_scan["leads"])
         
@@ -312,6 +329,82 @@ def run_scraper_task(req: SearchRequest, task_id: str):
         export_csv(no_website_leads, f"leads_{req.city}_{req.niche.replace(' ', '_')}.csv")
         export_excel(no_website_leads, f"leads_{req.city}_{req.niche.replace(' ', '_')}.xlsx")
         
+        # Recalculate stats for self-improving intelligence databases
+        total_found = len(all_leads)
+        unique_companies = len(deduped)
+        duplicate_results = total_found - unique_companies
+        emails_found = sum(1 for l in deduped if l.get("email"))
+        phones_found = sum(1 for l in deduped if l.get("phone"))
+        avg_lead_score = sum(l.get("score", 0) for l in deduped) / max(unique_companies, 1)
+        duplicate_rate = duplicate_results / max(total_found, 1)
+
+        # 1. Update Keyword Performance (Module 1)
+        try:
+            intel_engine.record_search_performance(
+                req.niche,
+                unique_companies,
+                emails_found,
+                phones_found,
+                duplicate_results,
+                avg_lead_score
+            )
+            add_log("Self-Improving Engine: Updated Keyword Performance matrices.", True)
+        except Exception as e:
+            logger.error(f"Failed to record keyword performance: {e}")
+
+        # 2. Update Source Performance (Module 4)
+        try:
+            for src in req.sources:
+                src_leads = [l for l in all_leads if l.get("source") == src]
+                src_total = len(src_leads)
+                src_deduped = deduplicate(src_leads)
+                src_uniques = len(src_deduped)
+                src_duplicates = src_total - src_uniques
+                src_emails = sum(1 for l in src_deduped if l.get("email"))
+                src_phones = sum(1 for l in src_deduped if l.get("phone"))
+                src_avg_score = sum(l.get("score", 0) for l in src_deduped) / max(src_uniques, 1)
+                
+                intel_engine.record_source_performance(
+                    src,
+                    src_uniques,
+                    src_emails,
+                    src_phones,
+                    src_duplicates,
+                    src_avg_score
+                )
+            add_log("Self-Improving Engine: Recalculated Source Efficiency metrics.", True)
+        except Exception as e:
+            logger.error(f"Failed to record source performance: {e}")
+
+        # 3. Update Duplicate Learning & priority adjustment (Module 7)
+        try:
+            intel_engine.update_duplicate_learning(req.niche, req.city, duplicate_results, total_found)
+            add_log("Self-Improving Engine: Adapted duplicate crawl rate restrictions.", True)
+        except Exception as e:
+            logger.error(f"Failed to update duplicate learning: {e}")
+
+        # 4. Update Search Path Optimization (Module 6)
+        try:
+            intel_engine.record_search_path(
+                f"{req.niche} in {req.city}",
+                unique_companies,
+                avg_lead_score,
+                duplicate_rate
+            )
+            add_log("Self-Improving Engine: Analyzed search path success rates.", True)
+        except Exception as e:
+            logger.error(f"Failed to record search path optimization: {e}")
+
+        # 5. Seed Industry Dictionary automatically if keyword performance is high (Module 5)
+        try:
+            intel_engine.add_industry_knowledge(req.niche, "keyword", req.niche)
+            for l in no_website_leads[:3]:
+                if l.get("category"):
+                    intel_engine.add_industry_knowledge(req.niche, "synonym", l["category"])
+                    intel_engine.add_competitor_expansion(req.niche, l["category"])
+        except Exception as e:
+            logger.error(f"Failed to seed industry dictionary: {e}")
+
         with lock:
             active_scan["state"] = "COMPLETED"
         

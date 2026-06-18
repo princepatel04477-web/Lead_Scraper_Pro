@@ -152,7 +152,44 @@ def generate_google_maps_queries(niche: str, city: str, country: str, broaden: b
     # 1. Base Query
     queries.append(f"{niche} in {city} {country}")
 
-    # 2. Semantic & Service Expansion
+    # Fetch from SQLite database (Self-Improving Lead Intelligence Engine)
+    adaptive_kws = []
+    db_syns = []
+    try:
+        from scrapers.intelligence_engine import LeadIntelligenceEngine
+        engine = LeadIntelligenceEngine()
+        
+        # Pull adaptive keywords using Multi-Armed Bandit allocation (70% top, 20% medium, 10% experimental)
+        adaptive_kws = engine.get_adaptive_keywords(niche, count=8)
+        
+        # Pull industry knowledge base terms (synonyms, services, related industries)
+        ind_dict = engine.get_industry_dictionary(niche)
+        for term_type in ['synonym', 'service', 'related_industry']:
+            db_syns.extend(ind_dict.get(term_type, []))
+            
+        # Get competitor expansions
+        cursor = engine.conn.cursor()
+        cursor.execute("SELECT related_industry FROM competitor_expansion WHERE industry = ?", (niche_lower,))
+        comp_rows = cursor.fetchall()
+        db_syns.extend([r["related_industry"] for r in comp_rows])
+    except Exception as e:
+        logger.warning(f"Could not connect to database in query_generator: {e}")
+
+    # Prioritize Adaptive Keywords (from MAB Multi-Armed Bandit Allocation)
+    for kw in adaptive_kws:
+        q1 = f"{kw} in {city} {country}"
+        q2 = f"{kw} in {city}"
+        for q in [q1, q2]:
+            if q not in queries:
+                queries.append(q)
+
+    # Prioritize Discovered Synonyms/Competitors
+    for syn in db_syns:
+        q = f"{syn} in {city} {country}"
+        if q not in queries:
+            queries.append(q)
+
+    # 2. Semantic & Service Expansion (Static Fallback)
     syns = [niche]
     for key, val in NICHE_SYNONYMS.items():
         if key in niche_lower or niche_lower in key:
@@ -196,7 +233,30 @@ def generate_facebook_queries(niche: str, city: str, country: str) -> list[str]:
     # 1. Base Google Dorking
     queries.append(f"site:facebook.com {niche} in {city} {country}")
 
-    # 2. Semantic & Service expansions
+    # Fetch from SQLite database (Self-Improving Lead Intelligence Engine)
+    adaptive_kws = []
+    db_syns = []
+    try:
+        from scrapers.intelligence_engine import LeadIntelligenceEngine
+        engine = LeadIntelligenceEngine()
+        adaptive_kws = engine.get_adaptive_keywords(niche, count=5)
+        ind_dict = engine.get_industry_dictionary(niche)
+        for term_type in ['synonym', 'service', 'related_industry']:
+            db_syns.extend(ind_dict.get(term_type, []))
+    except Exception as e:
+        logger.warning(f"Could not connect to database in query_generator: {e}")
+
+    for kw in adaptive_kws:
+        q = f"site:facebook.com {kw} in {city}"
+        if q not in queries:
+            queries.append(q)
+
+    for syn in db_syns:
+        q = f"site:facebook.com {syn} in {city}"
+        if q not in queries:
+            queries.append(q)
+
+    # 2. Semantic & Service expansions (Static Fallback)
     syns = [niche]
     for key, val in NICHE_SYNONYMS.items():
         if key in niche_lower or niche_lower in key:
