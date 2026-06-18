@@ -38,21 +38,13 @@ export default function App() {
         setRepository(data);
       }
     } catch (err) {
-      console.warn('Backend offline. Using local storage or mock repository.');
+      console.warn('Backend offline. Using local storage or empty repository.');
       // Load from localStorage if available
       const localRepo = localStorage.getItem('lead_repository');
       if (localRepo) {
         setRepository(JSON.parse(localRepo));
       } else {
-        // Fallback mockup seeds
-        const mockSeeds = [
-          { name: "Aura Quantum", category: "Deep Tech", score: 92.0, status: "Active", address: "Boston, MA", phone: "+1 617-555-0143", email: "contact@auraq.io", website: "auraq.io" },
-          { name: "Vortex Dynamics", category: "Logistics", score: 85.0, status: "Active", address: "Dallas, TX", phone: "+1 214-555-0198", email: "ops@vortexdyn.com", website: "vortexdyn.com" },
-          { name: "Nexo Robotics", category: "Automation", score: 78.0, status: "Archived", address: "Detroit, MI", phone: "+1 313-555-0182", email: "info@nexorobotics.com", website: "nexorobotics.com" },
-          { name: "Synapse Labs", category: "Biotech", score: 88.0, status: "Active", address: "Seattle, WA", phone: "+1 206-555-0129", email: "research@synapselabs.org", website: "synapselabs.org" }
-        ];
-        setRepository(mockSeeds);
-        localStorage.setItem('lead_repository', JSON.stringify(mockSeeds));
+        setRepository([]);
       }
     }
   };
@@ -183,10 +175,10 @@ export default function App() {
     ];
 
     const mockLeadsList = [
-      { name: "Acme Corp", category: params.niche, score: 98.4, address: `${params.city}, ${params.country}`, phone: "+1 555-0198", email: "j.doe@acme.io", website: "acme.io" },
-      { name: "Globex Dynamics", category: params.niche, score: 94.1, address: `${params.city}, ${params.country}`, phone: "+1 555-0245", email: "s.connor@globex.net", website: "globex.net" },
-      { name: "Initech Solutions", category: params.niche, score: 89.7, address: `${params.city}, ${params.country}`, phone: "+1 555-0892", email: "m.bolton@initech.co", website: "initech.co" },
-      { name: "Soylent Corp", category: params.niche, score: 82.3, address: `${params.city}, ${params.country}`, phone: "+1 555-0112", email: "r.thorn@soylent.io", website: "soylent.io" }
+      { name: "Acme Corp", category: params.niche, score: 98.4, address: `${params.city}, ${params.country}`, phone: "+1 555-0198", email: "j.doe@acme.io", website: "acme.io", source: "google_maps" },
+      { name: "Globex Dynamics", category: params.niche, score: 94.1, address: `${params.city}, ${params.country}`, phone: "+1 555-0245", email: "s.connor@globex.net", website: "globex.net", source: "facebook" },
+      { name: "Initech Solutions", category: params.niche, score: 89.7, address: `${params.city}, ${params.country}`, phone: "+1 555-0892", email: "m.bolton@initech.co", website: "initech.co", source: "yellowpages" },
+      { name: "Soylent Corp", category: params.niche, score: 82.3, address: `${params.city}, ${params.country}`, phone: "+1 555-0112", email: "r.thorn@soylent.io", website: "soylent.io", source: "instagram" }
     ];
 
     if (mockIntervalRef.current) clearInterval(mockIntervalRef.current);

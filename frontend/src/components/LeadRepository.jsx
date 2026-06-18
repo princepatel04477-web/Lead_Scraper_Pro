@@ -1,5 +1,56 @@
 import React, { useState, useEffect } from 'react';
 
+const getPlatformIcon = (source) => {
+  switch (source) {
+    case 'google_maps':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-accent)" strokeWidth="2.5" style={{ minWidth: '18px' }}>
+          <path d="M12 2a8 8 0 0 0-8 8c0 1.89.62 3.63 1.66 5.04L12 22l6.34-6.96A7.975 7.975 0 0 0 20 10a8 8 0 0 0-8-8z"/>
+          <circle cx="12" cy="10" r="3" fill="var(--primary-accent)"/>
+        </svg>
+      );
+    case 'yellowpages':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" strokeWidth="2.5" style={{ minWidth: '18px' }}>
+          <rect x="3" y="3" width="18" height="18" rx="2" fill="rgba(251, 191, 36, 0.1)"/>
+          <line x1="9" y1="3" x2="9" y2="21"/>
+        </svg>
+      );
+    case 'instagram':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EC4899" strokeWidth="2.5" style={{ minWidth: '18px' }}>
+          <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+          <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+          <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+        </svg>
+      );
+    case 'facebook':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2.5" style={{ minWidth: '18px' }}>
+          <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" fill="rgba(59, 130, 246, 0.1)"/>
+        </svg>
+      );
+    default:
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" style={{ minWidth: '18px' }}>
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      );
+  }
+};
+
+const getPlatformLabel = (source) => {
+  switch (source) {
+    case 'google_maps': return 'Google Maps';
+    case 'yellowpages': return 'Yellow Pages';
+    case 'instagram': return 'Instagram';
+    case 'facebook': return 'Facebook';
+    default: return 'Google Maps'; // default
+  }
+};
+
 export default function LeadRepository({ repository, onUpdateStatus }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('score'); // score, name, sector
@@ -13,7 +64,8 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
     return (
       (lead.name || '').toLowerCase().includes(term) ||
       (lead.category || '').toLowerCase().includes(term) ||
-      (lead.address || '').toLowerCase().includes(term)
+      (lead.address || '').toLowerCase().includes(term) ||
+      getPlatformLabel(lead.source).toLowerCase().includes(term)
     );
   });
 
@@ -57,7 +109,21 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
 
   const downloadCSV = () => {
     if (repository.length === 0) return;
-    const headers = ['Name', 'Category', 'Address', 'Phone', 'Email', 'Website', 'Score', 'Status', 'Timestamp'];
+    
+    // Header row
+    const headers = ['Name', 'Category', 'Address', 'Phone', 'Email', 'Website', 'Source', 'Score', 'Status', 'Timestamp'];
+    
+    // Format each value correctly (escape quotes, handle commas)
+    const formatValue = (val) => {
+      if (val === null || val === undefined) return '';
+      const stringVal = String(val).trim();
+      // If contains comma, double quote or newline, wrap in quotes and escape internal quotes
+      if (stringVal.includes(',') || stringVal.includes('"') || stringVal.includes('\n') || stringVal.includes('\r')) {
+        return `"${stringVal.replace(/"/g, '""')}"`;
+      }
+      return stringVal;
+    };
+
     const rows = repository.map(l => [
       l.name || '',
       l.category || '',
@@ -65,6 +131,7 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
       l.phone || '',
       l.email || '',
       l.website || '',
+      getPlatformLabel(l.source),
       l.score || '',
       l.status || 'Active',
       l.timestamp || ''
@@ -72,10 +139,11 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      ...rows.map(row => row.map(formatValue).join(','))
     ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Add UTF-8 BOM to make Excel open it with correct encoding
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
@@ -169,7 +237,15 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
                   <div className="entity-avatar">
                     {getInitials(lead.name)}
                   </div>
-                  <span className="entity-name">{lead.name || 'Unknown Company'}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span className="entity-name" style={{ fontWeight: 500 }}>{lead.name || 'Unknown Company'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                      {getPlatformIcon(lead.source)}
+                      <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                        {getPlatformLabel(lead.source)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="repo-sector-col">
@@ -208,7 +284,7 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
 
           {sortedLeads.length === 0 && (
             <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-              No matching records found.
+              No saved records found in repository. Run a search to populate.
             </div>
           )}
         </div>

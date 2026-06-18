@@ -1,5 +1,56 @@
 import React from 'react';
 
+const getPlatformIcon = (source) => {
+  switch (source) {
+    case 'google_maps':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-accent)" strokeWidth="2.5" style={{ minWidth: '18px' }}>
+          <path d="M12 2a8 8 0 0 0-8 8c0 1.89.62 3.63 1.66 5.04L12 22l6.34-6.96A7.975 7.975 0 0 0 20 10a8 8 0 0 0-8-8z"/>
+          <circle cx="12" cy="10" r="3" fill="var(--primary-accent)"/>
+        </svg>
+      );
+    case 'yellowpages':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" strokeWidth="2.5" style={{ minWidth: '18px' }}>
+          <rect x="3" y="3" width="18" height="18" rx="2" fill="rgba(251, 191, 36, 0.1)"/>
+          <line x1="9" y1="3" x2="9" y2="21"/>
+        </svg>
+      );
+    case 'instagram':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EC4899" strokeWidth="2.5" style={{ minWidth: '18px' }}>
+          <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+          <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+          <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+        </svg>
+      );
+    case 'facebook':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2.5" style={{ minWidth: '18px' }}>
+          <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" fill="rgba(59, 130, 246, 0.1)"/>
+        </svg>
+      );
+    default:
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" style={{ minWidth: '18px' }}>
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      );
+  }
+};
+
+const getPlatformLabel = (source) => {
+  switch (source) {
+    case 'google_maps': return 'Google Maps';
+    case 'yellowpages': return 'Yellow Pages';
+    case 'instagram': return 'Instagram';
+    case 'facebook': return 'Facebook';
+    default: return 'Google Maps';
+  }
+};
+
 export default function ResultsStream({ leads, state }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--stack-lg)', height: '100%', width: '100%' }}>
@@ -38,8 +89,14 @@ export default function ResultsStream({ leads, state }) {
         {leads.map((lead, idx) => (
           <div key={idx} className="lead-row-card">
             <div className="lead-name-col">
-              <span className="lead-name">{lead.name || 'Unknown Company'}</span>
-              <span className="lead-sector">{lead.category || 'N/A'}</span>
+              <span className="lead-name" style={{ fontWeight: 500 }}>{lead.name || 'Unknown Company'}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                {getPlatformIcon(lead.source)}
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                  {getPlatformLabel(lead.source)}
+                </span>
+              </div>
+              <span className="lead-sector" style={{ marginTop: '4px' }}>{lead.category || 'N/A'}</span>
             </div>
 
             <div className="lead-contact-col">

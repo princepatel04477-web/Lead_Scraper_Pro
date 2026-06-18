@@ -146,6 +146,7 @@ def run_scraper_task(req: SearchRequest):
                 broaden=req.broaden
             )
             for lead in leads:
+                lead["source"] = "google_maps"
                 add_lead(lead)
             all_leads.extend(leads)
             add_log(f"Google Maps: Found {len(leads)} raw leads.", True)
@@ -162,7 +163,7 @@ def run_scraper_task(req: SearchRequest):
                 add_log(msg)
             leads = scraper.scrape(req.niche, req.city, req.country, req.max_results, yp_callback)
             for lead in leads:
-                # Avoid duplication in live view if possible
+                lead["source"] = "yellowpages"
                 add_lead(lead)
             all_leads.extend(leads)
             add_log(f"Yellow Pages: Found {len(leads)} raw leads.", True)
@@ -179,6 +180,7 @@ def run_scraper_task(req: SearchRequest):
                 add_log(msg)
             leads = scraper.scrape(req.niche, req.city, req.country, req.max_results, insta_callback)
             for lead in leads:
+                lead["source"] = "instagram"
                 add_lead(lead)
             all_leads.extend(leads)
             add_log(f"Instagram Scraper completed. Found {len(leads)} raw leads.", True)
@@ -197,6 +199,7 @@ def run_scraper_task(req: SearchRequest):
                 add_log(msg)
             leads = scraper.scrape(req.niche, req.city, req.country, req.max_results, fb_callback)
             for lead in leads:
+                lead["source"] = "facebook"
                 add_lead(lead)
             all_leads.extend(leads)
             add_log(f"Facebook Scraper completed. Found {len(leads)} raw leads.", True)
@@ -346,99 +349,9 @@ def seed_repository():
     os.makedirs("output", exist_ok=True)
     repo_file = "output/repository.json"
     if not os.path.exists(repo_file) or os.path.getsize(repo_file) < 5:
-        seeds = [
-            {
-                "name": "Aura Quantum",
-                "category": "Deep Tech",
-                "score": 92.0,
-                "status": "Active",
-                "address": "Boston, MA",
-                "phone": "+1 617-555-0143",
-                "email": "contact@auraq.io",
-                "website": "auraq.io",
-                "timestamp": "2026-06-18 12:00:00"
-            },
-            {
-                "name": "Vortex Dynamics",
-                "category": "Logistics",
-                "score": 85.0,
-                "status": "Active",
-                "address": "Dallas, TX",
-                "phone": "+1 214-555-0198",
-                "email": "ops@vortexdyn.com",
-                "website": "vortexdyn.com",
-                "timestamp": "2026-06-18 12:05:00"
-            },
-            {
-                "name": "Nexo Robotics",
-                "category": "Automation",
-                "score": 78.0,
-                "status": "Archived",
-                "address": "Detroit, MI",
-                "phone": "+1 313-555-0182",
-                "email": "info@nexorobotics.com",
-                "website": "nexorobotics.com",
-                "timestamp": "2026-06-18 12:10:00"
-            },
-            {
-                "name": "Synapse Labs",
-                "category": "Biotech",
-                "score": 88.0,
-                "status": "Active",
-                "address": "Seattle, WA",
-                "phone": "+1 206-555-0129",
-                "email": "research@synapselabs.org",
-                "website": "synapselabs.org",
-                "timestamp": "2026-06-18 12:15:00"
-            },
-            {
-                "name": "Acme Corp",
-                "category": "Enterprise Software",
-                "score": 98.4,
-                "status": "Active",
-                "address": "San Francisco, CA",
-                "phone": "+1 555-0198",
-                "email": "j.doe@acme.io",
-                "website": "acme.io",
-                "timestamp": "2026-06-18 12:20:00"
-            },
-            {
-                "name": "Globex Dynamics",
-                "category": "Aerospace Logistics",
-                "score": 94.1,
-                "status": "Active",
-                "address": "Austin, TX",
-                "phone": "+1 555-0245",
-                "email": "s.connor@globex.net",
-                "website": "globex.net",
-                "timestamp": "2026-06-18 12:25:00"
-            },
-            {
-                "name": "Initech Solutions",
-                "category": "Fintech Infrastructure",
-                "score": 89.7,
-                "status": "Active",
-                "address": "New York, NY",
-                "phone": "+1 555-0892",
-                "email": "m.bolton@initech.co",
-                "website": "initech.co",
-                "timestamp": "2026-06-18 12:30:00"
-            },
-            {
-                "name": "Soylent Corp",
-                "category": "AgriTech Analytics",
-                "score": 82.3,
-                "status": "Active",
-                "address": "Chicago, IL",
-                "phone": "+1 555-0112",
-                "email": "r.thorn@soylent.io",
-                "website": "soylent.io",
-                "timestamp": "2026-06-18 12:35:00"
-            }
-        ]
         with open(repo_file, "w") as f:
-            json.dump(seeds, f, indent=2)
-        logger.info("Seeded repository database with initial leads.")
+            json.dump([], f, indent=2)
+        logger.info("Initialized empty repository database.")
 
 if __name__ == "__main__":
     import uvicorn
