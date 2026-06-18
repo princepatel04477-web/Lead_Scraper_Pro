@@ -53,7 +53,17 @@ class FacebookScraper:
         opts.add_experimental_option("excludeSwitches", ["enable-automation"])
         opts.add_experimental_option("useAutomationExtension", False)
 
-        service = Service(ChromeDriverManager().install())
+        import os
+        if os.path.exists("/usr/bin/chromium-browser"):
+            opts.binary_location = "/usr/bin/chromium-browser"
+        elif os.path.exists("/usr/bin/chromium"):
+            opts.binary_location = "/usr/bin/chromium"
+
+        if os.path.exists("/usr/bin/chromedriver"):
+            service = Service("/usr/bin/chromedriver")
+        else:
+            service = Service(ChromeDriverManager().install())
+            
         driver = webdriver.Chrome(service=service, options=opts)
         driver.execute_cdp_cmd(
             "Page.addScriptToEvaluateOnNewDocument",
