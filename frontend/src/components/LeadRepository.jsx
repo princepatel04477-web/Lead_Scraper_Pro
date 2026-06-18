@@ -47,26 +47,50 @@ const getPlatformLabel = (source) => {
     case 'yellowpages': return 'Yellow Pages';
     case 'instagram': return 'Instagram';
     case 'facebook': return 'Facebook';
-    default: return 'Google Maps'; // default
+    default: return 'Google Maps';
+  }
+};
+
+const getTierColorClass = (tier) => {
+  switch (tier) {
+    case 'Exceptional Website': return 'tier-exceptional';
+    case 'Good Website': return 'tier-good';
+    case 'Weak Website': return 'tier-weak';
+    case 'Dead Website': return 'tier-dead';
+    case 'No Website': return 'tier-none';
+    default: return 'tier-pending';
   }
 };
 
 export default function LeadRepository({ repository, onUpdateStatus }) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('score'); // score, name, sector
+  const [sortBy, setSortBy] = useState('score'); // score, name, sector, website_score
   const [sortOrder, setSortOrder] = useState('desc'); // desc, asc
+  const [filterTier, setFilterTier] = useState('all'); // all, exceptional, good, weak, dead, none
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 8;
 
-  // Filter leads based on search term
+  // Filter leads based on search term & website quality tier
   const filteredLeads = repository.filter(lead => {
     const term = searchTerm.toLowerCase();
-    return (
+    const matchesSearch = (
       (lead.name || '').toLowerCase().includes(term) ||
       (lead.category || '').toLowerCase().includes(term) ||
       (lead.address || '').toLowerCase().includes(term) ||
       getPlatformLabel(lead.source).toLowerCase().includes(term)
     );
+
+    if (filterTier === 'all') return matchesSearch;
+    
+    const tier = lead.website_tier || 'Pending Check';
+    if (filterTier === 'exceptional' && tier === 'Exceptional Website') return matchesSearch;
+    if (filterTier === 'good' && tier === 'Good Website') return matchesSearch;
+    if (filterTier === 'weak' && tier === 'Weak Website') return matchesSearch;
+    if (filterTier === 'dead' && tier === 'Dead Website') return matchesSearch;
+    if (filterTier === 'none' && tier === 'No Website') return matchesSearch;
+    if (filterTier === 'pending' && tier === 'Pending Check') return matchesSearch;
+    
+    return false;
   });
 
   // Sort leads
@@ -78,7 +102,10 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
     } else if (sortBy === 'sector') {
       valA = a.category || '';
       valB = b.category || '';
-    } else { // default: score
+    } else if (sortBy === 'website_score') {
+      valA = parseInt(a.website_score) || 0;
+      valB = parseInt(b.website_score) || 0;
+    } else { // default: score (Lead rating)
       valA = parseFloat(a.score) || 0;
       valB = parseFloat(b.score) || 0;
     }
@@ -93,10 +120,10 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedLeads = sortedLeads.slice(startIndex, startIndex + itemsPerPage);
 
-  // Reset page when search term changes
+  // Reset page when search term or filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, filterTier]);
 
   const toggleSort = (field) => {
     if (sortBy === field) {
@@ -111,13 +138,16 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
     if (repository.length === 0) return;
     
     // Header row
-    const headers = ['Name', 'Category', 'Address', 'Phone', 'Email', 'Website', 'Source', 'Score', 'Status', 'Timestamp'];
+    const headers = [
+      'Name', 'Category', 'Address', 'Phone', 'Email', 'Website', 'Source', 
+      'Lead Score', 'Website Score', 'Website Tier', 'Website Health', 
+      'Opportunity Tag', 'Business Maturity', 'Recommended Priority', 'Status', 'Timestamp'
+    ];
     
     // Format each value correctly (escape quotes, handle commas)
     const formatValue = (val) => {
       if (val === null || val === undefined) return '';
       const stringVal = String(val).trim();
-      // If contains comma, double quote or newline, wrap in quotes and escape internal quotes
       if (stringVal.includes(',') || stringVal.includes('"') || stringVal.includes('\n') || stringVal.includes('\r')) {
         return `"${stringVal.replace(/"/g, '""')}"`;
       }
@@ -133,6 +163,12 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
       l.website || '',
       getPlatformLabel(l.source),
       l.score || '',
+      l.website_score !== undefined ? l.website_score : '',
+      l.website_tier || 'Pending Check',
+      l.website_health || '',
+      l.upgrade_opportunity || '',
+      l.business_maturity || '',
+      l.recommended_priority || '',
       l.status || 'Active',
       l.timestamp || ''
     ]);
@@ -185,15 +221,44 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
             />
           </div>
 
+          <select
+            className="settings-select"
+            value={filterTier}
+            onChange={(e) => setFilterTier(e.target.value)}
+            style={{
+              padding: '6px 12px',
+              height: '34px',
+              background: 'var(--panel-bg)',
+              border: '1px solid var(--outline)',
+              borderRadius: '4px',
+              color: 'var(--text-muted)',
+              fontSize: '12px',
+              fontFamily: 'var(--font-mono)'
+            }}
+          >
+            <option value="all">All Web Tiers</option>
+            <option value="exceptional">Exceptional</option>
+            <option value="good">Good</option>
+            <option value="weak">Weak</option>
+            <option value="dead">Dead</option>
+            <option value="none">No Website</option>
+            <option value="pending">Pending Check</option>
+          </select>
+
           <button 
             className="btn-secondary" 
             onClick={() => toggleSort('score')}
             style={{ minWidth: '80px' }}
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-              filter_list
-            </span>
-            Sort: {sortBy}
+            Sort: Lead Rating {sortBy === 'score' && (sortOrder === 'asc' ? '▲' : '▼')}
+          </button>
+
+          <button 
+            className="btn-secondary" 
+            onClick={() => toggleSort('website_score')}
+            style={{ minWidth: '80px' }}
+          >
+            Sort: Web Score {sortBy === 'website_score' && (sortOrder === 'asc' ? '▲' : '▼')}
           </button>
 
           <button 
@@ -211,28 +276,29 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
       {/* Main Table */}
       <div className="table-container">
         {/* Table Header */}
-        <div className="table-hdr-grid">
+        <div className="table-hdr-grid" style={{ gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1.2fr' }}>
           <div onClick={() => toggleSort('name')} style={{ cursor: 'pointer' }}>
             Entity Name {sortBy === 'name' && (sortOrder === 'asc' ? '▲' : '▼')}
           </div>
           <div onClick={() => toggleSort('sector')} style={{ cursor: 'pointer' }}>
             Sector {sortBy === 'sector' && (sortOrder === 'asc' ? '▲' : '▼')}
           </div>
-          <div onClick={() => toggleSort('score')} style={{ cursor: 'pointer' }}>
-            Intelligence Score {sortBy === 'score' && (sortOrder === 'asc' ? '▲' : '▼')}
-          </div>
+          <div>Lead Rating</div>
+          <div>Website Quality</div>
           <div style={{ textAlign: 'right' }}>Status</div>
         </div>
 
         {/* Rows */}
         <div className="table-rows-container">
           {paginatedLeads.map((lead, idx) => {
-            // Score normalization for progress bar
             const rawScore = parseFloat(lead.score) || 80.0;
-            const progressPercent = Math.min(Math.max((rawScore - 60) * 2.5, 10), 100); // map 60-100 to 10%-100%
+            const progressPercent = Math.min(Math.max((rawScore - 60) * 2.5, 10), 100);
+            
+            const webScore = lead.website_score || 0;
+            const tier = lead.website_tier || 'Pending Check';
 
             return (
-              <div key={idx} className="table-row-item">
+              <div key={idx} className="table-row-item" style={{ gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1.2fr', padding: '12px 16px' }}>
                 <div className="repo-entity-col">
                   <div className="entity-avatar">
                     {getInitials(lead.name)}
@@ -241,7 +307,7 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
                     <span className="entity-name" style={{ fontWeight: 500 }}>{lead.name || 'Unknown Company'}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
                       {getPlatformIcon(lead.source)}
-                      <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
                         {getPlatformLabel(lead.source)}
                       </span>
                     </div>
@@ -252,14 +318,27 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
                   <span className="sector-tag">{lead.category || 'N/A'}</span>
                 </div>
 
-                <div className="repo-score-col">
-                  <div className="score-bar-bg">
+                <div className="repo-score-col" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+                  <div className="score-bar-bg" style={{ width: '80px' }}>
                     <div
                       className="score-bar-fill"
                       style={{ width: `${progressPercent}%` }}
                     ></div>
                   </div>
-                  <span className="score-num">{(rawScore / 100).toFixed(2)}</span>
+                  <span className="score-num" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                    Rating: {rawScore.toFixed(1)}
+                  </span>
+                </div>
+
+                <div className="repo-web-col" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span className={`tier-badge ${getTierColorClass(tier)}`} style={{ padding: '2px 6px', fontSize: '9px', width: 'fit-content' }}>
+                    {tier}
+                  </span>
+                  {lead.website_exists && (
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                      Score: {webScore}/100
+                    </span>
+                  )}
                 </div>
 
                 <div className="repo-status-col" style={{ justifyContent: 'flex-end' }}>
@@ -284,7 +363,7 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
 
           {sortedLeads.length === 0 && (
             <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-              No saved records found in repository. Run a search to populate.
+              No saved records found matching the filter criteria.
             </div>
           )}
         </div>

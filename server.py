@@ -18,8 +18,10 @@ from scrapers import GoogleMapsScraper, InstagramScraper, YellowPagesScraper, Fa
 from scrapers.intelligence_engine import LeadIntelligenceEngine
 from utils.filters import filter_no_website, deduplicate
 from utils.export import export_csv, export_excel
+from utils.website_quality import WebsiteQualityIntelligenceSystem
 
 intel_engine = LeadIntelligenceEngine()
+website_quality_system = WebsiteQualityIntelligenceSystem()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("server")
@@ -92,7 +94,61 @@ def add_log(msg: str, is_success: bool = False):
             except Exception:
                 pass
 
+def evaluate_and_update_website_quality(lead_name: str, website: str, lead_copy: dict):
+    try:
+        res = website_quality_system.evaluate_website(website, lead_copy)
+        with lock:
+            found_lead = None
+            for l in active_scan["leads"]:
+                if l.get("name") == lead_name:
+                    l.update(res)
+                    found_lead = l
+                    break
+            
+            # Re-evaluate lead score with updated website metrics
+            if found_lead:
+                score, breakdown = intel_engine.calculate_lead_score(found_lead)
+                found_lead["score"] = float(score)
+                found_lead["score_breakdown"] = breakdown
+                
+                # Update lead in active_scan leads list
+                for i, l in enumerate(active_scan["leads"]):
+                    if l.get("name") == lead_name:
+                        active_scan["leads"][i] = found_lead
+                        break
+
+                event_data = {
+                    "type": "lead_update",
+                    "data": found_lead,
+                    "stats": {
+                        "state": active_scan["state"],
+                        "niche": active_scan["niche"],
+                        "city": active_scan["city"],
+                        "country": active_scan["country"],
+                        "entities": active_scan["entities_discovered"],
+                        "contacts": active_scan["contacts_verified"]
+                    }
+                }
+                for q in list(stream_queues):
+                    try:
+                        q.put_nowait(event_data)
+                    except Exception:
+                        pass
+    except Exception as e:
+        logger.error(f"Failed to evaluate website quality for {lead_name}: {e}")
+
 def add_lead(lead: dict):
+    # Initialize default website quality attributes
+    has_web = bool(lead.get("website"))
+    lead["website_exists"] = has_web
+    lead["website_score"] = 0
+    lead["website_tier"] = "Pending Check" if has_web else "No Website"
+    lead["website_health"] = "Pending" if has_web else "None"
+    lead["upgrade_opportunity"] = "High" if not has_web and (lead.get("phone") or lead.get("email")) else "None"
+    lead["business_maturity"] = "Struggling"
+    lead["recommended_priority"] = "High" if not has_web and (lead.get("phone") or lead.get("email")) else "Low"
+    lead["website_checks"] = {}
+
     # Calculate deterministic lead quality score (Module 8)
     score, breakdown = intel_engine.calculate_lead_score(lead)
     lead["score"] = float(score)
@@ -110,6 +166,12 @@ def add_lead(lead: dict):
         threading.Thread(
             target=intel_engine.discover_keywords_from_url,
             args=(lead["name"], lead["website"]),
+            daemon=True
+        ).start()
+        # Asynchronously evaluate website quality
+        threading.Thread(
+            target=evaluate_and_update_website_quality,
+            args=(lead["name"], lead["website"], lead.copy()),
             daemon=True
         ).start()
         
@@ -287,9 +349,21 @@ def run_scraper_task(req: SearchRequest, task_id: str):
         deduped = deduplicate(all_leads)
         add_log(f"Deduplication complete: {len(deduped)} unique leads.", True)
         
-        add_log("Filtering leads to identify businesses without websites...")
-        no_website_leads = filter_no_website(deduped)
-        add_log(f"Filtered results: {len(no_website_leads)} businesses found without a website.", True)
+        add_log("Post-processing: Evaluating website quality metrics...")
+        for lead in deduped:
+            if lead.get("website") and lead.get("website_tier") == "Pending Check":
+                try:
+                    res = website_quality_system.evaluate_website(lead["website"], lead)
+                    lead.update(res)
+                    # Re-calculate score
+                    score, breakdown = intel_engine.calculate_lead_score(lead)
+                    lead["score"] = float(score)
+                    lead["score_breakdown"] = breakdown
+                except Exception as e:
+                    logger.error(f"Failed final website evaluation for {lead.get('name')}: {e}")
+                    
+        no_website_leads = deduped
+        add_log(f"Website Quality Intelligence System complete: {len(no_website_leads)} total leads processed.", True)
         
         # Save specific search results to leads_{task_id}.json
         leads_task_file = f"output/leads_{task_id}.json"

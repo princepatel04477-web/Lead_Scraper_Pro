@@ -178,6 +178,9 @@ export default function App() {
       } else if (data.type === 'lead') {
         setStreamedLeads(prev => [data.data, ...prev]);
         setStats(prev => ({ ...prev, ...data.stats }));
+      } else if (data.type === 'lead_update') {
+        setStreamedLeads(prev => prev.map(l => l.name === data.data.name ? data.data : l));
+        setStats(prev => ({ ...prev, ...data.stats }));
       }
 
       // If scan completes, refetch repository and search history
