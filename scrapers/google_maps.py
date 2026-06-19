@@ -12,6 +12,7 @@ import time
 import random
 import re
 import logging
+import concurrent.futures
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -132,12 +133,13 @@ class GoogleMapsScraper:
             prev_count = cur_count
 
     # ── Extract one business detail ─────────────────────
-    def _extract_detail(self) -> dict | None:
+    def _extract_detail(self, driver=None) -> dict | None:
+        driver = driver or getattr(self, 'driver', None)
         biz = {}
 
         # Name
         try:
-            h1 = WebDriverWait(self.driver, 5).until(
+            h1 = WebDriverWait(driver, 5).until(
                 EC.presence_of_element_located(
                     (By.CSS_SELECTOR, "h1.DUwDvf, h1.fontHeadlineLarge")
                 )
@@ -146,7 +148,7 @@ class GoogleMapsScraper:
         except TimeoutException:
             # fallback: grab whatever h1 is there
             try:
-                biz["name"] = self.driver.find_element(By.TAG_NAME, "h1").text.strip()
+                biz["name"] = driver.find_element(By.TAG_NAME, "h1").text.strip()
             except Exception:
                 return None
 
@@ -155,7 +157,7 @@ class GoogleMapsScraper:
 
         # Category / type
         try:
-            cat = self.driver.find_element(
+            cat = driver.find_element(
                 By.CSS_SELECTOR, 'button[jsaction*="category"]'
             )
             biz["category"] = cat.text.strip()
@@ -164,7 +166,7 @@ class GoogleMapsScraper:
 
         # Address
         try:
-            el = self.driver.find_element(
+            el = driver.find_element(
                 By.CSS_SELECTOR, 'button[data-item-id="address"]'
             )
             aria = el.get_attribute("aria-label") or ""
@@ -174,7 +176,7 @@ class GoogleMapsScraper:
 
         # Phone
         try:
-            el = self.driver.find_element(
+            el = driver.find_element(
                 By.CSS_SELECTOR, 'button[data-item-id^="phone:"]'
             )
             raw = el.get_attribute("data-item-id") or ""
@@ -184,7 +186,7 @@ class GoogleMapsScraper:
 
         # Website
         try:
-            el = self.driver.find_element(
+            el = driver.find_element(
                 By.CSS_SELECTOR, 'a[data-item-id="authority"]'
             )
             biz["website"] = el.get_attribute("href") or ""
@@ -193,7 +195,7 @@ class GoogleMapsScraper:
 
         # Rating & review count
         try:
-            rating_el = self.driver.find_element(
+            rating_el = driver.find_element(
                 By.CSS_SELECTOR, 'div.F7nice span[aria-hidden="true"]'
             )
             biz["rating"] = rating_el.text.strip()
@@ -201,7 +203,7 @@ class GoogleMapsScraper:
             biz["rating"] = ""
 
         try:
-            reviews_el = self.driver.find_element(
+            reviews_el = driver.find_element(
                 By.CSS_SELECTOR, 'div.F7nice span[aria-label*="review"]'
             )
             text = reviews_el.get_attribute("aria-label") or ""
@@ -211,7 +213,7 @@ class GoogleMapsScraper:
             biz["reviews"] = ""
 
         # Google Maps URL of this place
-        biz["maps_url"] = self.driver.current_url
+        biz["maps_url"] = driver.current_url
 
         # Source tag
         biz["source"] = "Google Maps"
@@ -251,16 +253,17 @@ class GoogleMapsScraper:
             logger.debug(f"Instaloader failed to fetch profile {instagram_url}: {e}")
         return ""
 
-    def _classify_page_load(self, url: str) -> str:
+    def _classify_page_load(self, url: str, driver=None) -> str:
+        driver = driver or getattr(self, 'driver', None)
         url_lower = url.lower()
         
         # Check page text for errors using selenium
         try:
-            title = self.driver.title.lower()
+            title = driver.title.lower()
             if any(err in title for err in ["404", "not found", "error", "site can't be reached", "server not found", "dns_probe_finished"]):
                 return "No Website"
                 
-            body_element = self.driver.find_element(By.TAG_NAME, "body")
+            body_element = driver.find_element(By.TAG_NAME, "body")
             body_text = body_element.text.lower()[:500] if body_element else ""
             if any(err in body_text for err in ["404 - file or directory not found", "page not found", "404 not found", "site cannot be reached"]):
                 return "No Website"
@@ -279,7 +282,8 @@ class GoogleMapsScraper:
                 
         return "Good Website"
 
-    def _verify_website_and_instagram(self, biz: dict) -> dict:
+    def _verify_website_and_instagram(self, biz: dict, driver=None) -> dict:
+        driver = driver or getattr(self, 'driver', None)
         url = biz.get("website", "").strip()
         biz["instagram"] = ""
         biz["website_status"] = "No Website"
@@ -291,19 +295,19 @@ class GoogleMapsScraper:
         url_lower = url.lower()
         is_instagram = "instagram.com" in url_lower
         
-        original_handle = self.driver.current_window_handle
+        original_handle = driver.current_window_handle
         
         try:
             # open new tab
-            self.driver.execute_script("window.open('about:blank', '_blank');")
+            driver.execute_script("window.open('about:blank', '_blank');")
             time.sleep(0.5)
-            self.driver.switch_to.window(self.driver.window_handles[-1])
+            driver.switch_to.window(driver.window_handles[-1])
             
             logger.info(f"Opening website to verify: {url}")
-            self.driver.get(url)
+            driver.get(url)
             time.sleep(3)
             
-            final_url = self.driver.current_url
+            final_url = driver.current_url
             if "instagram.com" in final_url.lower():
                 is_instagram = True
                 url = final_url
@@ -316,7 +320,7 @@ class GoogleMapsScraper:
                 found_link = ""
                 try:
                     # check for common redirect links
-                    links = self.driver.find_elements(By.CSS_SELECTOR, "a[href*='l.instagram.com'], a[href*='instagram.com/l.php']")
+                    links = driver.find_elements(By.CSS_SELECTOR, "a[href*='l.instagram.com'], a[href*='instagram.com/l.php']")
                     for l in links:
                         href = l.get_attribute("href")
                         if href:
@@ -326,7 +330,7 @@ class GoogleMapsScraper:
                                 
                     if not found_link:
                         # Scan all external links
-                        all_links = self.driver.find_elements(By.TAG_NAME, "a")
+                        all_links = driver.find_elements(By.TAG_NAME, "a")
                         for l in all_links:
                             href = l.get_attribute("href") or ""
                             if href and not any(d in href.lower() for d in ["instagram.com", "facebook.com", "threads.net", "javascript:"]):
@@ -342,17 +346,17 @@ class GoogleMapsScraper:
                     logger.info(f"Found website in Instagram bio: {found_link}")
                     biz["website"] = found_link
                     try:
-                        self.driver.get(found_link)
+                        driver.get(found_link)
                         time.sleep(3)
-                        final_bio_url = self.driver.current_url
-                        biz["website_status"] = self._classify_page_load(final_bio_url)
+                        final_bio_url = driver.current_url
+                        biz["website_status"] = self._classify_page_load(final_bio_url, driver)
                     except Exception as e:
                         logger.warning(f"Failed to load Instagram bio website {found_link}: {e}")
                         biz["website_status"] = "No Website"
                 else:
                     biz["website_status"] = "No Website"
             else:
-                biz["website_status"] = self._classify_page_load(final_url)
+                biz["website_status"] = self._classify_page_load(final_url, driver)
                 biz["website"] = final_url
                 
         except Exception as e:
@@ -361,20 +365,143 @@ class GoogleMapsScraper:
             
         finally:
             try:
-                if len(self.driver.window_handles) > 1:
-                    self.driver.close()
+                if len(driver.window_handles) > 1:
+                    driver.close()
             except Exception:
                 pass
             try:
-                self.driver.switch_to.window(original_handle)
+                driver.switch_to.window(original_handle)
             except Exception:
-                if self.driver.window_handles:
-                    self.driver.switch_to.window(self.driver.window_handles[0])
+                if driver.window_handles:
+                    driver.switch_to.window(driver.window_handles[0])
                     
         return biz
 
 
     # ── Main public method ──────────────────────────────
+
+    def _agent_scrape(self, query: str, max_results: int, progress_callback, broaden: bool, seen_names: set, seen_lock) -> list[dict]:
+        driver = self._build_driver()
+        businesses = []
+        try:
+            url = "https://www.google.com/maps/search/" + query.replace(" ", "+")
+            if progress_callback:
+                progress_callback(f"Opening Google Maps for: '{query}'…")
+            driver.get(url)
+            import time
+            time.sleep(4)
+
+            # handle consent
+            try:
+                from selenium.webdriver.support.ui import WebDriverWait
+                from selenium.webdriver.support import expected_conditions as EC
+                from selenium.webdriver.common.by import By
+                from selenium.common.exceptions import TimeoutException
+                btn = WebDriverWait(driver, 5).until(
+                    EC.element_to_be_clickable((By.XPATH, "//button[contains(.,'Accept all')]"))
+                )
+                btn.click()
+                time.sleep(1)
+            except Exception:
+                pass
+
+            if progress_callback:
+                progress_callback(f"Scrolling to load listings for '{query}'…")
+
+            # scroll feed
+            try:
+                feed = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, 'div[role="feed"]'))
+                )
+                import random
+                prev_count = 0
+                stale_rounds = 0
+                for i in range(15):  # config.GOOGLE_MAPS_MAX_SCROLLS usually 15
+                    driver.execute_script("arguments[0].scrollTop = arguments[0].scrollHeight", feed)
+                    time.sleep(2 + random.uniform(0.3, 1.0))
+
+                    links = feed.find_elements(By.CSS_SELECTOR, 'a[href*="/maps/place/"]')
+                    cur_count = len(links)
+
+                    try:
+                        feed.find_element(By.XPATH, './/*[contains(text(),"end of results")]')
+                        break
+                    except Exception:
+                        pass
+
+                    if cur_count == prev_count:
+                        stale_rounds += 1
+                        if stale_rounds >= 3:
+                            break
+                    else:
+                        stale_rounds = 0
+                    prev_count = cur_count
+            except Exception as e:
+                pass
+
+            try:
+                feed = driver.find_element(By.CSS_SELECTOR, 'div[role="feed"]')
+                result_els = feed.find_elements(By.CSS_SELECTOR, 'a[href*="/maps/place/"]')
+            except Exception:
+                result_els = []
+
+            total = min(len(result_els), max_results)
+            if total <= 0:
+                return businesses
+
+            if progress_callback:
+                progress_callback(f"[{query}] Found {len(result_els)} listings. Extracting top {total}…")
+
+            for idx in range(len(result_els)):
+                if len(businesses) >= max_results:
+                    break
+                try:
+                    feed = driver.find_element(By.CSS_SELECTOR, 'div[role="feed"]')
+                    links = feed.find_elements(By.CSS_SELECTOR, 'a[href*="/maps/place/"]')
+                    if idx >= len(links):
+                        break
+
+                    el = links[idx]
+                    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
+                    time.sleep(0.5)
+                    el.click()
+                    time.sleep(1.5 + random.uniform(0.2, 0.8))
+
+                    biz = self._extract_detail(driver=driver)
+                    if biz:
+                        name_norm = biz["name"].lower().strip()
+                        with seen_lock:
+                            is_new = name_norm not in seen_names
+                            if is_new:
+                                seen_names.add(name_norm)
+
+                        if is_new:
+                            biz = self._verify_website_and_instagram(biz, driver=driver)
+                            businesses.append(biz)
+                            if progress_callback:
+                                progress_callback(f"[{query}] [{len(businesses)}/{max_results}] {biz['name']}")
+
+                    try:
+                        back = driver.find_element(By.CSS_SELECTOR, 'button[aria-label="Back"], button[jsaction*="back"]')
+                        back.click()
+                    except Exception:
+                        driver.back()
+                    time.sleep(1.5)
+
+                except Exception as exc:
+                    try:
+                        driver.back()
+                        time.sleep(1)
+                    except Exception:
+                        pass
+                    continue
+
+        finally:
+            driver.quit()
+
+        return businesses
+
+
     def scrape(
         self,
         niche: str,
@@ -401,130 +528,46 @@ class GoogleMapsScraper:
         from utils.query_generator import generate_google_maps_queries
         queries = generate_google_maps_queries(niche, city, country, broaden=broaden)
 
-        self.driver = self._build_driver()
+        num_agents = 10
+        leads_per_agent = max(1, max_results // num_agents)
+
         businesses: list[dict] = []
         seen_names = set()
+        import threading
+        seen_lock = threading.Lock()
 
-        try:
-            for q_idx, query in enumerate(queries):
-                if len(businesses) >= max_results:
-                    break
-                if not broaden and q_idx >= 3:
-                    # If not broadening, only run the top 3 highly relevant semantic queries
-                    break
+        # Google maps doesn't paginate easily with start=N.
+        # Instead of doing identical queries which wastes resources,
+        # we just only run up to the number of unique queries we have.
+        # We can broaden the queries artificially to match num_agents.
+        if len(queries) < num_agents:
+            additional = [
+                f"{q} offices" for q in queries
+            ] + [
+                f"{q} services" for q in queries
+            ] + [
+                f"top {q}" for q in queries
+            ]
+            queries.extend(additional)
 
-                url = (
-                    "https://www.google.com/maps/search/"
-                    + query.replace(" ", "+")
-                )
+        agent_queries = queries[:num_agents]
+        # Adjust leads_per_agent if we run fewer agents to still hit max_results
+        actual_agents = len(agent_queries)
+        if actual_agents > 0:
+            leads_per_agent = max(1, max_results // actual_agents) + 1
 
-                if progress_callback:
-                    if q_idx > 0:
-                        progress_callback(f"Low results. Broadening search to: '{query}'…")
-                    else:
-                        progress_callback(f"Opening Google Maps for: '{query}'…")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_agents) as executor:
+            futures = []
+            for q in agent_queries:
+                futures.append(executor.submit(self._agent_scrape, q, leads_per_agent, progress_callback, broaden, seen_names, seen_lock))
 
-                self.driver.get(url)
-                time.sleep(4)
-
-                self._handle_consent()
-
-                # scroll to load listings
-                if progress_callback:
-                    progress_callback(f"Scrolling to load listings for '{query}'…")
-                self._scroll_feed(
-                    max_scrolls=config.GOOGLE_MAPS_MAX_SCROLLS,
-                    callback=progress_callback,
-                )
-
-                # collect all result links
+            for future in concurrent.futures.as_completed(futures):
                 try:
-                    feed = self.driver.find_element(
-                        By.CSS_SELECTOR, 'div[role="feed"]'
-                    )
-                    result_els = feed.find_elements(
-                        By.CSS_SELECTOR, 'a[href*="/maps/place/"]'
-                    )
-                except NoSuchElementException:
-                    logger.error("No feed / result links found.")
-                    continue
+                    res = future.result()
+                    for biz in res:
+                        if len(businesses) < max_results:
+                            businesses.append(biz)
+                except Exception as e:
+                    logger.warning(f"Agent scrape error: {e}")
 
-                total = min(len(result_els), max_results - len(businesses))
-                if total <= 0:
-                    continue
-
-                if progress_callback:
-                    progress_callback(f"Found {len(result_els)} listings. Extracting top {total}…")
-
-                for idx in range(len(result_els)):
-                    if len(businesses) >= max_results:
-                        break
-                    try:
-                        # re-fetch elements (DOM may have changed)
-                        feed = self.driver.find_element(
-                            By.CSS_SELECTOR, 'div[role="feed"]'
-                        )
-                        links = feed.find_elements(
-                            By.CSS_SELECTOR, 'a[href*="/maps/place/"]'
-                        )
-                        if idx >= len(links):
-                            break
-
-                        el = links[idx]
-
-                        # scroll element into view
-                        self.driver.execute_script(
-                            "arguments[0].scrollIntoView({block:'center'});", el
-                        )
-                        time.sleep(0.5)
-                        el.click()
-                        time.sleep(
-                            config.GOOGLE_MAPS_CLICK_PAUSE + random.uniform(0.2, 0.8)
-                        )
-
-                        biz = self._extract_detail()
-                        if biz:
-                            name_norm = biz["name"].lower().strip()
-                            if name_norm not in seen_names:
-                                seen_names.add(name_norm)
-                                if progress_callback:
-                                    progress_callback(f"Verifying website status for {biz['name']}…")
-                                biz = self._verify_website_and_instagram(biz)
-                                businesses.append(biz)
-                                if progress_callback:
-                                    progress_callback(
-                                        f"[{len(businesses)}/{max_results}]  {biz['name']} ({biz['website_status']})"
-                                    )
-
-                        # go back to list (press back or click back arrow)
-                        try:
-                            back = self.driver.find_element(
-                                By.CSS_SELECTOR,
-                                'button[aria-label="Back"], button[jsaction*="back"]',
-                            )
-                            back.click()
-                        except NoSuchElementException:
-                            self.driver.back()
-                        time.sleep(1.5)
-
-                    except (
-                        StaleElementReferenceException,
-                        ElementClickInterceptedException,
-                        TimeoutException,
-                    ) as exc:
-                        logger.debug(f"Skipping result {idx}: {exc}")
-                        try:
-                            self.driver.back()
-                            time.sleep(1)
-                        except Exception:
-                            pass
-                        continue
-                    except Exception as exc:
-                        logger.warning(f"Unexpected error on result {idx}: {exc}")
-                        continue
-
-        finally:
-            self.driver.quit()
-            self.driver = None
-
-        return businesses
+        return businesses[:max_results]

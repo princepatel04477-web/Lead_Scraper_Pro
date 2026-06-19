@@ -9,6 +9,7 @@ Uses the free `instaloader` library to:
 
 import re
 import logging
+import concurrent.futures
 import instaloader
 from typing import Optional
 
@@ -57,6 +58,82 @@ class InstagramScraper:
         return match.group(0).strip() if match else ""
 
     # ── Main scrape ─────────────────────────────────────
+
+    def _agent_scrape(self, hashtag: str, city: str, country: str, max_results: int, progress_callback, seen_usernames: set, seen_lock) -> list[dict]:
+        results = []
+        try:
+            L = instaloader.Instaloader(
+                download_pictures=False,
+                download_videos=False,
+                download_video_thumbnails=False,
+                download_comments=False,
+                save_metadata=False,
+                compress_json=False,
+            )
+            try:
+                tag_obj = instaloader.Hashtag.from_name(L.context, hashtag)
+            except Exception as e:
+                logger.debug(f"Hashtag #{hashtag} not found: {e}")
+                return results
+
+            post_count = 0
+            for post in tag_obj.get_posts():
+                if len(results) >= max_results:
+                    break
+                if post_count > 60:
+                    break
+                post_count += 1
+
+                profile = post.owner_profile
+                username = profile.username
+
+                with seen_lock:
+                    if username in seen_usernames:
+                        continue
+                    seen_usernames.add(username)
+
+                if not (profile.is_business_account or profile.business_category_name or profile.biography):
+                    continue
+
+                bio = profile.biography or ""
+                full_name = profile.full_name or ""
+                email = self._extract_email(bio)
+                phone = self._extract_phone(bio)
+
+                if not email and not phone:
+                    continue
+
+                combined = f"{bio} {full_name}".lower()
+                if city.lower() not in combined and country.lower() not in combined:
+                    if len(results) > 10:
+                        continue
+
+                from utils.filters import classify_website_url
+                ext_url = profile.external_url or ""
+                biz = {
+                    "name": full_name or username,
+                    "category": profile.business_category_name or "",
+                    "address": "",
+                    "phone": phone,
+                    "email": email,
+                    "website": ext_url,
+                    "website_status": classify_website_url(ext_url),
+                    "rating": "",
+                    "reviews": "",
+                    "instagram": f"https://instagram.com/{username}",
+                    "followers": profile.mediacount,
+                    "maps_url": "",
+                    "source": "Instagram",
+                }
+                results.append(biz)
+                if progress_callback:
+                    progress_callback(f"Instagram [{hashtag}] [{len(results)}]: @{username}")
+        except Exception as e:
+            logger.warning(f"Error processing #{hashtag}: {e}")
+
+        return results
+
+
     def scrape(
         self,
         niche: str,
@@ -67,82 +144,37 @@ class InstagramScraper:
     ) -> list[dict]:
         results: list[dict] = []
         seen_usernames: set[str] = set()
+        import threading
+        seen_lock = threading.Lock()
         hashtags = self._build_hashtags(niche, city)
 
-        for tag in hashtags:
-            if len(results) >= max_results:
-                break
-            if progress_callback:
-                progress_callback(f"Instagram: searching #{tag}")
+        num_agents = 10
+        leads_per_agent = max(1, max_results // num_agents)
 
-            try:
-                hashtag = instaloader.Hashtag.from_name(self.L.context, tag)
-            except Exception as e:
-                logger.debug(f"Hashtag #{tag} not found: {e}")
-                continue
+        # Do not blindly repeat the exact same hashtag to avoid duplicate effort.
+        # Generate enough unique variations.
+        agent_tags = hashtags[:]
+        if len(agent_tags) < num_agents:
+            more_tags = [t + "life" for t in hashtags] + [t + "style" for t in hashtags] + [t + "biz" for t in hashtags]
+            agent_tags.extend(more_tags)
+        agent_tags = agent_tags[:num_agents]
 
-            post_count = 0
-            try:
-                for post in hashtag.get_posts():
-                    if len(results) >= max_results:
-                        break
-                    if post_count > 60:  # limit posts scanned per tag
-                        break
-                    post_count += 1
+        actual_agents = len(agent_tags)
+        if actual_agents > 0:
+            leads_per_agent = max(1, max_results // actual_agents) + 1
 
-                    profile = post.owner_profile
-                    username = profile.username
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_agents) as executor:
+            futures = []
+            for tag in agent_tags:
+                futures.append(executor.submit(self._agent_scrape, tag, city, country, leads_per_agent, progress_callback, seen_usernames, seen_lock))
 
-                    if username in seen_usernames:
-                        continue
-                    seen_usernames.add(username)
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    res = future.result()
+                    for biz in res:
+                        if len(results) < max_results:
+                            results.append(biz)
+                except Exception as e:
+                    logger.warning(f"Agent scrape error: {e}")
 
-                    # only interested in business / creator accounts
-                    if not (profile.is_business_account
-                            or profile.business_category_name
-                            or profile.biography):
-                        continue
-
-                    bio = profile.biography or ""
-                    full_name = profile.full_name or ""
-                    email = self._extract_email(bio)
-                    phone = self._extract_phone(bio)
-
-                    # skip if no contact info at all
-                    if not email and not phone:
-                        continue
-
-                    # check city mention in bio/name/location loosely
-                    combined = f"{bio} {full_name}".lower()
-                    if city.lower() not in combined and country.lower() not in combined:
-                        # only skip if we have plenty; keep if we're thin
-                        if len(results) > 10:
-                            continue
-
-                    from utils.filters import classify_website_url
-                    ext_url = profile.external_url or ""
-                    biz = {
-                        "name": full_name or username,
-                        "category": profile.business_category_name or niche,
-                        "address": "",
-                        "phone": phone,
-                        "email": email,
-                        "website": ext_url,
-                        "website_status": classify_website_url(ext_url),
-                        "rating": "",
-                        "reviews": "",
-                        "instagram": f"https://instagram.com/{username}",
-                        "followers": profile.mediacount,
-                        "maps_url": "",
-                        "source": "Instagram",
-                    }
-                    results.append(biz)
-                    if progress_callback:
-                        progress_callback(
-                            f"Instagram [{len(results)}]: @{username}"
-                        )
-            except Exception as e:
-                logger.warning(f"Error processing #{tag}: {e}")
-                continue
-
-        return results
+        return results[:max_results]

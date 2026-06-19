@@ -9,6 +9,7 @@ import re
 import time
 import random
 import logging
+import concurrent.futures
 import requests
 from bs4 import BeautifulSoup
 
@@ -35,15 +36,70 @@ class YellowPagesScraper:
     ) -> list[dict]:
 
         results: list[dict] = []
+        num_agents = 10
+        leads_per_agent = max(1, max_results // num_agents)
 
-        # try multiple directory sources
-        results += self._scrape_yellowpages(niche, city, country, max_results, progress_callback)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_agents) as executor:
+            futures = []
+            for page in range(1, num_agents + 1):
+                futures.append(executor.submit(self._agent_scrape, niche, city, country, page, leads_per_agent, progress_callback))
+
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    res = future.result()
+                    for biz in res:
+                        if len(results) < max_results:
+                            results.append(biz)
+                except Exception as e:
+                    logger.warning(f"Agent scrape error: {e}")
+
+        # Fallback to Yelp if we still need more leads
         if len(results) < max_results:
             results += self._scrape_yelp(niche, city, max_results - len(results), progress_callback)
 
         return results[:max_results]
 
-    # ── Yellow Pages ────────────────────────────────────
+
+    def _agent_scrape(self, niche: str, city: str, country: str, page: int, max_results: int, callback) -> list[dict]:
+        results = []
+        country_lower = country.lower().strip()
+        if "canada" in country_lower:
+            base = "https://www.yellowpages.ca"
+            search_url = f"{base}/search/si/1/{niche.replace(' ', '+')}/{city.replace(' ', '+')}"
+        elif "india" in country_lower:
+            base = "https://www.justdial.com"
+            search_url = f"{base}/{city}/{niche.replace(' ', '-')}"
+        else:  # default US
+            base = "https://www.yellowpages.com"
+            search_url = f"{base}/search?search_terms={niche.replace(' ', '+')}&geo_location_terms={city.replace(' ', '+')}"
+
+        page_url = search_url if page == 1 else f"{search_url}&page={page}"
+        try:
+            resp = requests.get(page_url, headers=HEADERS, timeout=15)
+            if resp.status_code != 200:
+                return results
+        except Exception as e:
+            logger.warning(f"YellowPages request failed: {e}")
+            return results
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        listings = soup.select("div.result, div.listing, div.search-results div.listing-item")
+        if not listings:
+            listings = soup.select("div.info")
+
+        for item in listings:
+            if len(results) >= max_results:
+                break
+            biz = self._parse_yp_listing(item)
+            if biz and biz.get("name"):
+                biz["source"] = "YellowPages"
+                results.append(biz)
+                if callback:
+                    callback(f"YellowPages [{len(results)}]: {biz['name']}")
+
+        return results
+
+
     def _scrape_yellowpages(
         self, niche, city, country, max_results, callback
     ) -> list[dict]:

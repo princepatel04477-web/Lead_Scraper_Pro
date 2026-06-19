@@ -320,6 +320,58 @@ class FacebookScraper:
         finally:
             driver.quit()
 
+
+    def _agent_search_google(self, query: str, start: int, max_results: int, progress_callback) -> list[str]:
+        unique_urls = []
+        driver = self._build_driver()
+        import urllib.parse
+        try:
+            search_url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&start={start}"
+            if progress_callback:
+                progress_callback(f"Facebook: searching Google for '{query}' (start={start})…")
+
+            driver.get(search_url)
+            import time, random
+            time.sleep(random.uniform(2.5, 4.0))
+            # call existing consent handler on THIS driver
+            self._handle_google_consent_driver(driver)
+
+            from selenium.webdriver.common.by import By
+            links = driver.find_elements(By.XPATH, "//a[contains(@href, 'facebook.com') or contains(@href, 'fb.com')]")
+            for link in links:
+                if len(unique_urls) >= max_results:
+                    break
+                try:
+                    href = link.get_attribute("href")
+                    if href:
+                        norm = self._normalize_facebook_url(href)
+                        if norm:
+                            unique_urls.append(norm)
+                except Exception:
+                    pass
+        finally:
+            driver.quit()
+        return unique_urls
+
+    def _handle_google_consent_driver(self, driver):
+        consent_selectors = [
+            "//button[contains(.,'Accept all')]",
+            "//button[contains(.,'I agree')]",
+            "//div[contains(text(),'Accept all')]",
+            "//button[contains(.,'Accept All')]"
+        ]
+        from selenium.webdriver.common.by import By
+        import time
+        for selector in consent_selectors:
+            try:
+                btn = driver.find_element(By.XPATH, selector)
+                btn.click()
+                time.sleep(1)
+                break
+            except Exception:
+                pass
+
+
     def scrape(
         self,
         niche: str,
@@ -336,53 +388,38 @@ class FacebookScraper:
         unique_urls = []
         seen_urls = set()
 
+        num_agents = 10
+        leads_per_agent = max(1, max_results // num_agents)
+
+        agent_tasks = []
+        # Generate tasks with proper pagination to avoid identical work
+        # Google search pagination uses `start` in increments of 10
+        for q_idx, query in enumerate(queries):
+            for start in range(0, (max_results // len(queries)) + 20, 10):
+                agent_tasks.append((query, start))
+
+        # Ensure we don't exceed num_agents tasks and they are all unique
+        agent_tasks = agent_tasks[:num_agents]
+
         try:
-            # 1. Search Google for site:facebook.com listings using expanded queries
-            for q_idx, query in enumerate(queries):
-                if len(unique_urls) >= max_results:
-                    break
+            with ThreadPoolExecutor(max_workers=num_agents) as executor:
+                futures = []
+                for query, start in agent_tasks:
+                    futures.append(executor.submit(self._agent_search_google, query, start, leads_per_agent, progress_callback))
 
-                # Search the first page (and second page for the primary query if needed)
-                pages_to_search = [0]
-                if q_idx == 0 and max_results > 10:
-                    pages_to_search.append(10)
+                for future in as_completed(futures):
+                    try:
+                        urls = future.result()
+                        for u in urls:
+                            if u not in seen_urls and len(unique_urls) < max_results:
+                                seen_urls.add(u)
+                                unique_urls.append(u)
+                    except Exception as e:
+                        logger.warning(f"Google Search Agent error: {e}")
 
-                for start in pages_to_search:
-                    if len(unique_urls) >= max_results:
-                        break
-
-                    search_url = f"https://www.google.com/search?q={urllib.parse.quote(query)}&start={start}"
-                    if progress_callback:
-                        progress_callback(f"Facebook: searching Google for '{query}'…")
-
-                    self.driver.get(search_url)
-                    time.sleep(random.uniform(2.5, 4.0))
-                    self._handle_google_consent()
-
-                    links = self.driver.find_elements(
-                        By.XPATH, "//a[contains(@href, 'facebook.com') or contains(@href, 'fb.com')]"
-                    )
-                    for link in links:
-                        try:
-                            href = link.get_attribute("href")
-                            if href:
-                                norm = self._normalize_facebook_url(href)
-                                if norm and norm not in seen_urls:
-                                    seen_urls.add(norm)
-                                    unique_urls.append(norm)
-                        except Exception:
-                            pass
-
-            unique_urls = unique_urls[:max_results]
             if progress_callback:
                 progress_callback(f"Facebook: Found {len(unique_urls)} page URLs. Scraping profiles…")
 
-            # Close the main search driver to save RAM before starting parallel execution
-            if self.driver:
-                self.driver.quit()
-                self.driver = None
-
-            # 2. Visit each Facebook page to extract information
             if unique_urls:
                 progress_lock = threading.Lock()
                 completed_count = 0
@@ -398,7 +435,7 @@ class FacebookScraper:
                             else:
                                 progress_callback(f"Facebook progress: {completed_count}/{total_urls} profiles completed")
 
-                with ThreadPoolExecutor(max_workers=12) as executor:
+                with ThreadPoolExecutor(max_workers=10) as executor:
                     futures = {
                         executor.submit(self._scrape_single_profile, url, niche, city): url
                         for url in unique_urls
@@ -423,4 +460,4 @@ class FacebookScraper:
                 self.driver.quit()
                 self.driver = None
 
-        return businesses
+        return businesses[:max_results]
