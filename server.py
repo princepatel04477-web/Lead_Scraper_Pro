@@ -2,6 +2,7 @@ import os
 import sys
 import uuid
 import json
+import time
 import logging
 import threading
 import queue
@@ -62,16 +63,43 @@ active_scan = {
 
 # Queue for SSE streaming
 stream_queues = []
-lock = threading.Lock()
+lock = threading.RLock()
 
 class SearchRequest(BaseModel):
     niche: str
     city: str
-    country: str
+    country: str = ""
     sources: List[str] = ["google_maps", "yellowpages"]
     max_results: int = 50
+    target_leads: int = 20
+    worker_count: int = 6
     broaden: bool = True
     headless: bool = True
+
+active_scan = {
+    "task_id": None,
+    "state": "IDLE", # IDLE, ACTIVE, COMPLETED, ERROR
+    "niche": "",
+    "city": "",
+    "country": "",
+    "companies_found": 0,
+    "websites_verified": 0,
+    "emails_extracted": 0,
+    "phones_extracted": 0,
+    "duplicates_removed": 0,
+    "lead_quality_avg": 0.0,
+    "active_workers": 0,
+    "search_progress": 0.0,
+    "entities_discovered": 0, # keep for backward compatibility
+    "contacts_verified": 0,   # keep for backward compatibility
+    "logs": [],
+    "leads": [],
+    "latency": 24,
+    "workers_activity": {},
+}
+
+# Semaphore to limit max concurrent Selenium instances to protect RAM
+selenium_semaphore = threading.Semaphore(3)
 
 def add_log(msg: str, is_success: bool = False):
     with lock:
@@ -83,9 +111,18 @@ def add_log(msg: str, is_success: bool = False):
             "type": "log",
             "data": log_entry,
             "stats": {
+                "state": active_scan["state"],
                 "entities": active_scan["entities_discovered"],
                 "contacts": active_scan["contacts_verified"],
-                "state": active_scan["state"]
+                "companies_found": active_scan["companies_found"],
+                "websites_verified": active_scan["websites_verified"],
+                "emails_extracted": active_scan["emails_extracted"],
+                "phones_extracted": active_scan["phones_extracted"],
+                "duplicates_removed": active_scan["duplicates_removed"],
+                "lead_quality_avg": active_scan["lead_quality_avg"],
+                "active_workers": active_scan["active_workers"],
+                "search_progress": active_scan["search_progress"],
+                "workers_activity": active_scan.get("workers_activity", {})
             }
         }
         for q in list(stream_queues):
@@ -94,124 +131,95 @@ def add_log(msg: str, is_success: bool = False):
             except Exception:
                 pass
 
-def evaluate_and_update_website_quality(lead_name: str, website: str, lead_copy: dict):
-    try:
-        res = website_quality_system.evaluate_website(website, lead_copy)
-        with lock:
-            found_lead = None
-            for l in active_scan["leads"]:
-                if l.get("name") == lead_name:
-                    l.update(res)
-                    found_lead = l
-                    break
-            
-            # Re-evaluate lead score with updated website metrics
-            if found_lead:
-                score, breakdown = intel_engine.calculate_lead_score(found_lead)
-                found_lead["score"] = float(score)
-                found_lead["score_breakdown"] = breakdown
-                
-                # Update lead in active_scan leads list
-                for i, l in enumerate(active_scan["leads"]):
-                    if l.get("name") == lead_name:
-                        active_scan["leads"][i] = found_lead
-                        break
-
-                event_data = {
-                    "type": "lead_update",
-                    "data": found_lead,
-                    "stats": {
-                        "state": active_scan["state"],
-                        "niche": active_scan["niche"],
-                        "city": active_scan["city"],
-                        "country": active_scan["country"],
-                        "entities": active_scan["entities_discovered"],
-                        "contacts": active_scan["contacts_verified"]
-                    }
-                }
-                for q in list(stream_queues):
-                    try:
-                        q.put_nowait(event_data)
-                    except Exception:
-                        pass
-    except Exception as e:
-        logger.error(f"Failed to evaluate website quality for {lead_name}: {e}")
-
-def add_lead(lead: dict):
-    # Initialize default website quality attributes
-    has_web = bool(lead.get("website"))
-    lead["website_exists"] = has_web
-    lead["website_score"] = 0
-    lead["website_tier"] = "Pending Check" if has_web else "No Website"
-    lead["website_health"] = "Pending" if has_web else "None"
-    lead["upgrade_opportunity"] = "High" if not has_web and (lead.get("phone") or lead.get("email")) else "None"
-    lead["business_maturity"] = "Struggling"
-    lead["recommended_priority"] = "High" if not has_web and (lead.get("phone") or lead.get("email")) else "Low"
-    lead["website_checks"] = {}
-
-    # Calculate deterministic lead quality score (Module 8)
-    score, breakdown = intel_engine.calculate_lead_score(lead)
-    lead["score"] = float(score)
-    lead["score_breakdown"] = breakdown
+def generate_query_buckets(niche: str, city: str, country: str, count: int) -> List[str]:
+    from utils.geo_resolver import get_city_localities
+    localities = get_city_localities(city)
     
-    # Enrich the Company Knowledge Graph (Module 9)
-    try:
-        intel_engine.enrich_company_graph(lead)
-    except Exception as e:
-        logger.debug(f"Failed to enrich graph for {lead.get('name')}: {e}")
+    queries = []
+    # All workers search the same niche. Only workload/geographic areas change.
+    for loc in localities:
+        queries.append(f"{niche} in {loc}, {city}")
         
-    # Asynchronously discover keywords from company website (Module 2)
-    if lead.get("website"):
-        import threading
-        threading.Thread(
-            target=intel_engine.discover_keywords_from_url,
-            args=(lead["name"], lead["website"]),
-            daemon=True
-        ).start()
-        # Asynchronously evaluate website quality
-        threading.Thread(
-            target=evaluate_and_update_website_quality,
-            args=(lead["name"], lead["website"], lead.copy()),
-            daemon=True
-        ).start()
-        
-    with lock:
-        active_scan["leads"].append(lead)
-        active_scan["entities_discovered"] = len(active_scan["leads"])
-        
-        # A contact is verified if there is a phone or email
-        contacts = sum(1 for l in active_scan["leads"] if l.get("phone") or l.get("email"))
-        active_scan["contacts_verified"] = contacts
-        
-        event_data = {
-            "type": "lead",
-            "data": lead,
-            "stats": {
-                "entities": active_scan["entities_discovered"],
-                "contacts": active_scan["contacts_verified"],
-                "state": active_scan["state"]
-            }
-        }
-        for q in list(stream_queues):
-            try:
-                q.put_nowait(event_data)
-            except Exception:
-                pass
+    if len(queries) < count:
+        queries.append(f"{niche} in {city} CBD")
+        queries.append(f"{niche} in {city} Downtown")
+        queries.append(f"{niche} near {city}")
+        while len(queries) < count:
+            queries.append(f"{niche} in {localities[len(queries) % len(localities)]}, {city}")
+            
+    return queries[:count]
 
 def run_scraper_task(req: SearchRequest, task_id: str):
     global active_scan, cancel_requested
     
     cancel_requested = False
+    target = req.target_leads if req.target_leads != 20 else (req.max_results if req.max_results != 50 else 20)
+    
+    # 1. Resolve Country if omitted
+    if not req.country:
+        from utils.geo_resolver import resolve_country
+        req.country = resolve_country(req.city)
+        add_log(f"Auto-resolved country from city '{req.city}' -> '{req.country}'", True)
+        
+    # 2. Respect User-Controlled Worker Count (min 1, max 12)
+    W = max(1, min(12, req.worker_count))
+    
+    # 3. Generate Search buckets (Geographic expansion of business zones)
+    query_buckets = generate_query_buckets(req.niche, req.city, req.country, W)
+
+    # 3. Worker Status Helper
+    def update_worker_status(worker_id):
+        # Assumes caller holds lock
+        if worker_id not in active_scan["workers_activity"]:
+            return
+        w = active_scan["workers_activity"][worker_id]
+        if w.get("search_failed", False):
+            w["status"] = "Error"
+        elif w.get("extracting_count", 0) > 0:
+            w["status"] = "Extracting Contacts"
+        elif w.get("verifying_count", 0) > 0:
+            w["status"] = "Verifying Websites"
+        elif not w.get("search_done", False):
+            w["status"] = "Searching"
+        else:
+            w["status"] = "Completed"
+        
     with lock:
         active_scan["state"] = "ACTIVE"
         active_scan["task_id"] = task_id
         active_scan["niche"] = req.niche
         active_scan["city"] = req.city
         active_scan["country"] = req.country
+        active_scan["companies_found"] = 0
+        active_scan["websites_verified"] = 0
+        active_scan["emails_extracted"] = 0
+        active_scan["phones_extracted"] = 0
+        active_scan["duplicates_removed"] = 0
+        active_scan["no_website_leads"] = 0
+        active_scan["poor_website_leads"] = 0
+        active_scan["lead_quality_avg"] = 0.0
+        active_scan["active_workers"] = 0
+        active_scan["search_progress"] = 0.0
         active_scan["entities_discovered"] = 0
         active_scan["contacts_verified"] = 0
         active_scan["logs"] = []
         active_scan["leads"] = []
+        active_scan["workers_activity"] = {
+            f"Worker {i+1}": {
+                "status": "Idle",
+                "query": query_buckets[i],
+                "leads_found": 0,
+                "websites_verified": 0,
+                "emails_extracted": 0,
+                "phones_extracted": 0,
+                "search_time": 0,
+                "start_time": None,
+                "search_done": False,
+                "search_failed": False,
+                "verifying_count": 0,
+                "extracting_count": 0
+            } for i in range(W)
+        }
 
     # Write initial history entry
     import datetime
@@ -239,141 +247,510 @@ def run_scraper_task(req: SearchRequest, task_id: str):
     history.insert(0, history_entry)
     with open(history_file, "w") as f:
         json.dump(history, f, indent=2)
-    
-    add_log(f"System initialized. Establishing connection to intelligence nodes...", True)
+        
+    add_log(f"System initialized with {W} parallel workers. Target leads: {target}.", True)
     add_log(f"Initiating search expansion for '{req.niche}' in '{req.city}, {req.country}'...")
+
+    # Multi-Queue Setup
+    company_queue = queue.Queue()       # Shared Company Queue
+    verification_queue = queue.Queue()  # Shared Verification Queue
+    contact_queue = queue.Queue()       # Shared Contact Queue
     
-    all_leads = []
-    try:
-        # 1. Google Maps
-        if "google_maps" in req.sources:
-            check_cancel()
-            add_log("Starting Google Maps Scraper...")
-            try:
-                scraper = GoogleMapsScraper(headless=req.headless)
+    stop_event = threading.Event()
+    
+    # Shared URL Queue lock registry
+    shared_url_queue = {} # url -> {"status": "LOCKED", "assigned_worker": worker_id, "timestamp": time.time()}
+    shared_url_lock = threading.Lock()
+    
+    # Global Deduplication structures
+    visited_urls = set()
+    visited_domains = set()
+    visited_companies = set()
+    visited_phones = set()
+    dedup_lock = threading.Lock()
+    
+    import re
+    import urllib.parse
+    
+    def is_duplicate_and_add(lead: dict) -> bool:
+        name = lead.get("name", "")
+        website = lead.get("website", "")
+        phone = lead.get("phone", "")
+        
+        norm_name = re.sub(r"[^a-z0-9]", "", name.lower().strip())
+        
+        norm_domain = ""
+        if website:
+            parsed = urllib.parse.urlparse(website)
+            domain = parsed.netloc or parsed.path
+            norm_domain = domain.lower().replace("www.", "").strip()
+            
+        norm_phone = re.sub(r"[^0-9]", "", phone.strip())
+        
+        with dedup_lock:
+            if norm_name and norm_name in visited_companies:
+                return True
+            if website and website in visited_urls:
+                return True
+            if norm_domain and norm_domain in visited_domains:
+                return True
+            if norm_phone and norm_phone in visited_phones:
+                return True
                 
-                def gm_callback(msg):
-                    check_cancel()
-                    add_log(msg)
+            if norm_name:
+                visited_companies.add(norm_name)
+            if website:
+                visited_urls.add(website)
+            if norm_domain:
+                visited_domains.add(norm_domain)
+            if norm_phone:
+                visited_phones.add(norm_phone)
+                
+            return False
+            
+    def claim_and_lock_url(url: str, worker_id: str) -> bool:
+        if not url:
+            return True
+        with shared_url_lock:
+            parsed = urllib.parse.urlparse(url)
+            domain = (parsed.netloc or parsed.path).lower().replace("www.", "").strip()
+            
+            for locked_url, info in shared_url_queue.items():
+                l_parsed = urllib.parse.urlparse(locked_url)
+                l_domain = (l_parsed.netloc or l_parsed.path).lower().replace("www.", "").strip()
+                if locked_url == url or l_domain == domain:
+                    return False
                     
-                leads = scraper.scrape(
-                    req.niche, 
-                    req.city, 
-                    req.country, 
-                    req.max_results, 
-                    gm_callback, 
-                    broaden=req.broaden
-                )
-                for lead in leads:
-                    lead["source"] = "google_maps"
-                    add_lead(lead)
-                all_leads.extend(leads)
-                add_log(f"Google Maps: Found {len(leads)} raw leads.", True)
-            except SearchStoppedException:
-                raise
-            except Exception as e:
-                add_log(f"Google Maps Error: {str(e)}")
-                logger.exception("Google Maps error")
+            shared_url_queue[url] = {
+                "status": "LOCKED",
+                "assigned_worker": worker_id,
+                "timestamp": time.time()
+            }
+            return True
+            
+    def mark_url_completed(url: str):
+        if not url:
+            return
+        with shared_url_lock:
+            if url in shared_url_queue:
+                shared_url_queue[url]["status"] = "COMPLETED"
 
-        # 2. Yellow Pages
-        if "yellowpages" in req.sources:
-            check_cancel()
-            add_log("Starting Yellow Pages / Yelp Scraper...")
-            try:
-                scraper = YellowPagesScraper()
-                def yp_callback(msg):
-                    check_cancel()
-                    add_log(msg)
-                leads = scraper.scrape(req.niche, req.city, req.country, req.max_results, yp_callback)
-                for lead in leads:
-                    lead["source"] = "yellowpages"
-                    add_lead(lead)
-                all_leads.extend(leads)
-                add_log(f"Yellow Pages: Found {len(leads)} raw leads.", True)
-            except SearchStoppedException:
-                raise
-            except Exception as e:
-                add_log(f"Yellow Pages Error: {str(e)}")
-                logger.exception("Yellow Pages error")
-
-        # 3. Instagram
-        if "instagram" in req.sources:
-            check_cancel()
-            add_log("Starting Instagram Scraper...")
-            try:
-                scraper = InstagramScraper()
-                def insta_callback(msg):
-                    check_cancel()
-                    add_log(msg)
-                leads = scraper.scrape(req.niche, req.city, req.country, req.max_results, insta_callback)
-                for lead in leads:
-                    lead["source"] = "instagram"
-                    add_lead(lead)
-                all_leads.extend(leads)
-                add_log(f"Instagram Scraper completed. Found {len(leads)} raw leads.", True)
-            except SearchStoppedException:
-                raise
-            except Exception as e:
-                add_log(f"Instagram Error: {str(e)}")
-                logger.exception("Instagram error")
-
-        # 4. Facebook
-        if "facebook" in req.sources:
-            check_cancel()
-            add_log("Starting Facebook Scraper...")
-            try:
-                scraper = FacebookScraper(headless=req.headless)
-                def fb_callback(msg):
-                    check_cancel()
-                    add_log(msg)
-                leads = scraper.scrape(req.niche, req.city, req.country, req.max_results, fb_callback)
-                for lead in leads:
-                    lead["source"] = "facebook"
-                    add_lead(lead)
-                all_leads.extend(leads)
-                add_log(f"Facebook Scraper completed. Found {len(leads)} raw leads.", True)
-            except SearchStoppedException:
-                raise
-            except Exception as e:
-                add_log(f"Facebook Error: {str(e)}")
-                logger.exception("Facebook error")
-
-    except SearchStoppedException:
-        add_log("Search execution stopped by user. Finalizing and saving gathered leads...", True)
-    except Exception as e:
-        logger.exception("Scraper execution encountered a fatal error during scanning")
-        add_log(f"Scraper execution encountered a fatal error: {str(e)}")
-
-    try:
-        add_log("Post-processing: Deduplicating discovered leads...")
-        deduped = deduplicate(all_leads)
-        add_log(f"Deduplication complete: {len(deduped)} unique leads.", True)
+    # Stage 1: Search Workers
+    def search_worker_run(worker_idx, query):
+        worker_name = f"Worker {worker_idx}"
+        with lock:
+            active_scan["active_workers"] += 1
+            if worker_name in active_scan["workers_activity"]:
+                active_scan["workers_activity"][worker_name]["status"] = "Searching"
+                active_scan["workers_activity"][worker_name]["start_time"] = time.time()
+                
+        add_log(f"Worker {worker_idx} started searching bucket: '{query}'")
         
-        add_log("Post-processing: Evaluating website quality metrics...")
-        for lead in deduped:
-            if lead.get("website") and lead.get("website_tier") == "Pending Check":
+        def on_lead_discovered(lead):
+            lead["worker_id"] = worker_name
+            with lock:
+                active_scan["companies_found"] += 1
+                if worker_name in active_scan["workers_activity"]:
+                    w = active_scan["workers_activity"][worker_name]
+                    w["leads_found"] += 1
+            company_queue.put(lead)
+
+        try:
+            for src in req.sources:
+                if stop_event.is_set() or cancel_requested:
+                    break
+                
+                if src == "google_maps":
+                    add_log(f"Worker {worker_idx} requesting browser resource for maps...")
+                    with selenium_semaphore:
+                        if stop_event.is_set() or cancel_requested:
+                            break
+                        add_log(f"Worker {worker_idx} acquired browser. Scraping Google Maps...")
+                        try:
+                            scraper = GoogleMapsScraper(headless=req.headless)
+                            scraper.scrape(
+                                niche=query,
+                                city=req.city,
+                                country=req.country,
+                                max_results=target,
+                                progress_callback=None,
+                                broaden=False,
+                                lead_callback=on_lead_discovered,
+                                stop_check=lambda: stop_event.is_set() or cancel_requested
+                            )
+                        except Exception as e:
+                            logger.error(f"Worker {worker_idx} Google Maps Scraper failed: {e}")
+                            
+                elif src == "yellowpages":
+                    try:
+                        scraper = YellowPagesScraper()
+                        scraper.scrape(
+                            niche=query,
+                            city=req.city,
+                            country=req.country,
+                            max_results=target,
+                            progress_callback=None,
+                            lead_callback=on_lead_discovered,
+                            stop_check=lambda: stop_event.is_set() or cancel_requested
+                        )
+                    except Exception as e:
+                        logger.error(f"Worker {worker_idx} YellowPages Scraper failed: {e}")
+                        
+                elif src == "instagram":
+                    try:
+                        scraper = InstagramScraper()
+                        scraper.scrape(
+                            niche=query,
+                            city=req.city,
+                            country=req.country,
+                            max_results=target,
+                            progress_callback=None,
+                            lead_callback=on_lead_discovered,
+                            stop_check=lambda: stop_event.is_set() or cancel_requested
+                        )
+                    except Exception as e:
+                        logger.error(f"Worker {worker_idx} Instagram Scraper failed: {e}")
+                        
+                elif src == "facebook":
+                    add_log(f"Worker {worker_idx} requesting browser resource for Facebook...")
+                    with selenium_semaphore:
+                        if stop_event.is_set() or cancel_requested:
+                            break
+                        add_log(f"Worker {worker_idx} acquired browser. Scraping Facebook...")
+                        try:
+                            scraper = FacebookScraper(headless=req.headless)
+                            scraper.scrape(
+                                niche=query,
+                                city=req.city,
+                                country=req.country,
+                                max_results=target,
+                                progress_callback=None,
+                                lead_callback=on_lead_discovered,
+                                stop_check=lambda: stop_event.is_set() or cancel_requested
+                            )
+                        except Exception as e:
+                            logger.error(f"Worker {worker_idx} Facebook Scraper failed: {e}")
+        except Exception as e:
+            logger.error(f"Worker {worker_idx} encountered error: {e}")
+            with lock:
+                if worker_name in active_scan["workers_activity"]:
+                    active_scan["workers_activity"][worker_name]["search_failed"] = True
+        finally:
+            with lock:
+                active_scan["active_workers"] -= 1
+                if worker_name in active_scan["workers_activity"]:
+                    active_scan["workers_activity"][worker_name]["search_done"] = True
+                    update_worker_status(worker_name)
+            add_log(f"Worker {worker_idx} finished bucket: '{query}'")
+
+    # Stage 2: Website Verification Workers
+    def verification_worker_run(worker_idx):
+        worker_id = f"Verification Worker {worker_idx}"
+        while not stop_event.is_set() and not cancel_requested:
+            try:
+                lead = company_queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+                
+            if is_duplicate_and_add(lead):
+                with lock:
+                    active_scan["duplicates_removed"] += 1
+                company_queue.task_done()
+                continue
+                
+            website = lead.get("website", "")
+            parent_worker_id = lead.get("worker_id")
+            
+            if website:
+                if not claim_and_lock_url(website, worker_id):
+                    # Already locked or processed by another worker
+                    company_queue.task_done()
+                    continue
+            
+            if parent_worker_id:
+                with lock:
+                    if parent_worker_id in active_scan["workers_activity"]:
+                        active_scan["workers_activity"][parent_worker_id]["verifying_count"] += 1
+                        update_worker_status(parent_worker_id)
+            
+            try:
                 try:
-                    res = website_quality_system.evaluate_website(lead["website"], lead)
+                    res = website_quality_system.evaluate_website(website, lead)
                     lead.update(res)
-                    # Re-calculate score
-                    score, breakdown = intel_engine.calculate_lead_score(lead)
-                    lead["score"] = float(score)
-                    lead["score_breakdown"] = breakdown
+                    if website:
+                        mark_url_completed(website)
                 except Exception as e:
-                    logger.error(f"Failed final website evaluation for {lead.get('name')}: {e}")
+                    logger.error(f"Error checking website {website}: {e}")
+                    # default fallback
+                    lead.update({
+                        "website_exists": bool(website),
+                        "website_opportunity_score": 100 if not website else 50,
+                        "website_tier": "Tier E" if not website else "Tier C",
+                        "website_health": "Broken" if website else "None",
+                        "upgrade_opportunity": "High",
+                        "website_checks": {}
+                    })
+                    if website:
+                        mark_url_completed(website)
+            finally:
+                with lock:
+                    active_scan["websites_verified"] += 1
+                    if parent_worker_id and parent_worker_id in active_scan["workers_activity"]:
+                        w = active_scan["workers_activity"][parent_worker_id]
+                        w["websites_verified"] += 1
+                        w["verifying_count"] = max(0, w["verifying_count"] - 1)
+                        update_worker_status(parent_worker_id)
+                
+                verification_queue.put(lead)
+                company_queue.task_done()
+
+    # Stage 3: Contact Extraction Workers
+    def contact_worker_run():
+        while not stop_event.is_set() and not cancel_requested:
+            try:
+                lead = verification_queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+                
+            website = lead.get("website", "")
+            parent_worker_id = lead.get("worker_id")
+            
+            if parent_worker_id:
+                with lock:
+                    if parent_worker_id in active_scan["workers_activity"]:
+                        active_scan["workers_activity"][parent_worker_id]["extracting_count"] += 1
+                        update_worker_status(parent_worker_id)
+            
+            try:
+                if website:
+                    try:
+                        intel_engine.discover_keywords_from_url(lead["name"], website)
+                    except Exception:
+                        pass
+            finally:
+                with lock:
+                    if parent_worker_id and parent_worker_id in active_scan["workers_activity"]:
+                        w = active_scan["workers_activity"][parent_worker_id]
+                        w["extracting_count"] = max(0, w["extracting_count"] - 1)
+                        update_worker_status(parent_worker_id)
+                
+                contact_queue.put(lead)
+                verification_queue.task_done()
+
+    # Stage 4: Lead Scoring & DB Worker
+    def scoring_worker_run():
+        while not stop_event.is_set() and not cancel_requested:
+            try:
+                lead = contact_queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+                
+            score, breakdown = intel_engine.calculate_lead_score(lead)
+            lead["score"] = float(score)
+            lead["score_breakdown"] = breakdown
+            
+            # Populate Location details for advanced filtering
+            lead["country"] = req.country
+            lead["city"] = req.city
+            lead["area"] = ""
+            parent_worker_id = lead.get("worker_id")
+            if parent_worker_id:
+                with lock:
+                    if parent_worker_id in active_scan["workers_activity"]:
+                        q = active_scan["workers_activity"][parent_worker_id]["query"]
+                        # Match 'in {locality}, {city}'
+                        match = re.search(r"in\s+(.*?),\s*" + re.escape(req.city), q, re.I)
+                        if match:
+                            lead["area"] = match.group(1).strip().title()
+                        else:
+                            # fallback: clean query
+                            area_clean = q.lower().replace(req.niche.lower(), "").replace(req.city.lower(), "").replace("in", "").replace(",", "").strip()
+                            lead["area"] = area_clean.title()
+            
+            try:
+                intel_engine.enrich_company_graph(lead)
+            except Exception:
+                pass
+                
+            with lock:
+                if len(active_scan["leads"]) >= target:
+                    contact_queue.task_done()
+                    continue
                     
-        no_website_leads = deduped
-        add_log(f"Website Quality Intelligence System complete: {len(no_website_leads)} total leads processed.", True)
+                active_scan["leads"].append(lead)
+                active_scan["entities_discovered"] = len(active_scan["leads"])
+                
+                # Check tiers for metrics
+                tier = lead.get("website_tier")
+                if tier == "Tier E":
+                    active_scan["no_website_leads"] = active_scan.get("no_website_leads", 0) + 1
+                elif tier in ["Tier C", "Tier D"]:
+                    active_scan["poor_website_leads"] = active_scan.get("poor_website_leads", 0) + 1
+                
+                # Update extraction stats
+                emails = sum(1 for l in active_scan["leads"] if l.get("email"))
+                phones = sum(1 for l in active_scan["leads"] if l.get("phone"))
+                active_scan["emails_extracted"] = emails
+                active_scan["phones_extracted"] = phones
+                active_scan["contacts_verified"] = sum(1 for l in active_scan["leads"] if l.get("phone") or l.get("email"))
+                
+                # Update specific worker stats
+                parent_worker_id = lead.get("worker_id")
+                if parent_worker_id and parent_worker_id in active_scan["workers_activity"]:
+                    w = active_scan["workers_activity"][parent_worker_id]
+                    w["emails_extracted"] = sum(1 for l in active_scan["leads"] if l.get("worker_id") == parent_worker_id and l.get("email"))
+                    w["phones_extracted"] = sum(1 for l in active_scan["leads"] if l.get("worker_id") == parent_worker_id and l.get("phone"))
+                
+                # Calculate average quality
+                tot_score = sum(l.get("score", 0) for l in active_scan["leads"])
+                active_scan["lead_quality_avg"] = round(tot_score / len(active_scan["leads"]), 1)
+                
+                # Search Progress
+                active_scan["search_progress"] = round((len(active_scan["leads"]) / target) * 100, 1)
+                
+                # Stream Lead immediately
+                event_data = {
+                    "type": "lead",
+                    "data": lead,
+                    "stats": {
+                        "state": active_scan["state"],
+                        "entities": active_scan["entities_discovered"],
+                        "contacts": active_scan["contacts_verified"],
+                        "companies_found": active_scan["companies_found"],
+                        "websites_verified": active_scan["websites_verified"],
+                        "emails_extracted": active_scan["emails_extracted"],
+                        "phones_extracted": active_scan["phones_extracted"],
+                        "duplicates_removed": active_scan["duplicates_removed"],
+                        "lead_quality_avg": active_scan["lead_quality_avg"],
+                        "active_workers": active_scan["active_workers"],
+                        "search_progress": active_scan["search_progress"],
+                        "no_website_leads": active_scan.get("no_website_leads", 0),
+                        "poor_website_leads": active_scan.get("poor_website_leads", 0),
+                        "workers_activity": active_scan.get("workers_activity", {})
+                    }
+                }
+                for q in list(stream_queues):
+                    try:
+                        q.put_nowait(event_data)
+                    except Exception:
+                        pass
+                        
+                # Terminate search if target is met
+                if len(active_scan["leads"]) >= target:
+                    stop_event.set()
+                    add_log(f"Target count of {target} unique leads reached! Stopping all workers.", True)
+                    
+            contact_queue.task_done()
+
+    # 4. Spawn threads
+    search_threads = []
+    for i in range(W):
+        t = threading.Thread(target=search_worker_run, args=(i+1, query_buckets[i]), daemon=True)
+        search_threads.append(t)
+        t.start()
         
+    verification_threads = []
+    for i in range(4):
+        t = threading.Thread(target=verification_worker_run, args=(i+1,), daemon=True)
+        verification_threads.append(t)
+        t.start()
+        
+    contact_threads = []
+    for _ in range(4):
+        t = threading.Thread(target=contact_worker_run, daemon=True)
+        contact_threads.append(t)
+        t.start()
+        
+    scoring_thread = threading.Thread(target=scoring_worker_run, daemon=True)
+    scoring_thread.start()
+
+    # 5. Monitor and Join
+    try:
+        # Wait for all search workers to finish (unless stop/cancel)
+        while True:
+            # Check cancel requested from API
+            if cancel_requested:
+                stop_event.set()
+                add_log("Cancel signal received. Stopping search pipeline...")
+                break
+                
+            # Update search time for active workers in active_scan
+            with lock:
+                now = time.time()
+                for name, w in active_scan["workers_activity"].items():
+                    if w["status"] in ["Searching", "Verifying Websites", "Extracting Contacts"] and w["start_time"] is not None:
+                        w["search_time"] = int(now - w["start_time"])
+                
+                # Stream stats update
+                event_data = {
+                    "type": "stats",
+                    "stats": {
+                        "state": active_scan["state"],
+                        "entities": active_scan["entities_discovered"],
+                        "contacts": active_scan["contacts_verified"],
+                        "companies_found": active_scan["companies_found"],
+                        "websites_verified": active_scan["websites_verified"],
+                        "emails_extracted": active_scan["emails_extracted"],
+                        "phones_extracted": active_scan["phones_extracted"],
+                        "duplicates_removed": active_scan["duplicates_removed"],
+                        "lead_quality_avg": active_scan["lead_quality_avg"],
+                        "active_workers": active_scan["active_workers"],
+                        "search_progress": active_scan["search_progress"],
+                        "no_website_leads": active_scan.get("no_website_leads", 0),
+                        "poor_website_leads": active_scan.get("poor_website_leads", 0),
+                        "workers_activity": active_scan.get("workers_activity", {})
+                    }
+                }
+                for q in list(stream_queues):
+                    try:
+                        q.put_nowait(event_data)
+                    except Exception:
+                        pass
+                
+            # Check if all search threads are done
+            if not any(t.is_alive() for t in search_threads):
+                break
+                
+            time.sleep(0.5)
+            
+        # Join search threads
+        for t in search_threads:
+            t.join()
+            
+        # Drain queues
+        while not stop_event.is_set() and not cancel_requested:
+            if company_queue.empty() and verification_queue.empty() and contact_queue.empty():
+                break
+            time.sleep(0.5)
+            
+        # Stop remaining pipeline workers
+        stop_event.set()
+        
+        # Join verification, contact and scoring threads
+        for t in verification_threads:
+            t.join(timeout=1.0)
+        for t in contact_threads:
+            t.join(timeout=1.0)
+        scoring_thread.join(timeout=1.0)
+        
+    except Exception as e:
+        logger.exception("Scraper pipeline watcher failed")
+        add_log(f"Pipeline Watcher Error: {e}")
+        
+    # 6. Post-processing and saving results
+    try:
+        with lock:
+            final_leads = list(active_scan["leads"])
+            
         # Save specific search results to leads_{task_id}.json
         leads_task_file = f"output/leads_{task_id}.json"
         timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        for lead in no_website_leads:
+        for lead in final_leads:
             lead["timestamp"] = timestamp_str
             lead["status"] = "Active"
             
         with open(leads_task_file, "w") as f:
-            json.dump(no_website_leads, f, indent=2)
+            json.dump(final_leads, f, indent=2)
 
         # Save to local repository file
         repo_file = "output/repository.json"
@@ -385,7 +762,7 @@ def run_scraper_task(req: SearchRequest, task_id: str):
             except Exception:
                 existing_repo = []
                 
-        existing_repo.extend(no_website_leads)
+        existing_repo.extend(final_leads)
         
         # De-duplicate repository by name
         repo_dedup = []
@@ -400,16 +777,16 @@ def run_scraper_task(req: SearchRequest, task_id: str):
             json.dump(repo_dedup, f, indent=2)
             
         # Export CSV and Excel files
-        export_csv(no_website_leads, f"leads_{req.city}_{req.niche.replace(' ', '_')}.csv")
-        export_excel(no_website_leads, f"leads_{req.city}_{req.niche.replace(' ', '_')}.xlsx")
+        export_csv(final_leads, f"leads_{req.city}_{req.niche.replace(' ', '_')}.csv")
+        export_excel(final_leads, f"leads_{req.city}_{req.niche.replace(' ', '_')}.xlsx")
         
         # Recalculate stats for self-improving intelligence databases
-        total_found = len(all_leads)
-        unique_companies = len(deduped)
-        duplicate_results = total_found - unique_companies
-        emails_found = sum(1 for l in deduped if l.get("email"))
-        phones_found = sum(1 for l in deduped if l.get("phone"))
-        avg_lead_score = sum(l.get("score", 0) for l in deduped) / max(unique_companies, 1)
+        total_found = active_scan["companies_found"]
+        unique_companies = len(final_leads)
+        duplicate_results = active_scan["duplicates_removed"]
+        emails_found = active_scan["emails_extracted"]
+        phones_found = active_scan["phones_extracted"]
+        avg_lead_score = active_scan["lead_quality_avg"]
         duplicate_rate = duplicate_results / max(total_found, 1)
 
         # 1. Update Keyword Performance (Module 1)
@@ -429,22 +806,13 @@ def run_scraper_task(req: SearchRequest, task_id: str):
         # 2. Update Source Performance (Module 4)
         try:
             for src in req.sources:
-                src_leads = [l for l in all_leads if l.get("source") == src]
-                src_total = len(src_leads)
-                src_deduped = deduplicate(src_leads)
-                src_uniques = len(src_deduped)
-                src_duplicates = src_total - src_uniques
-                src_emails = sum(1 for l in src_deduped if l.get("email"))
-                src_phones = sum(1 for l in src_deduped if l.get("phone"))
-                src_avg_score = sum(l.get("score", 0) for l in src_deduped) / max(src_uniques, 1)
-                
                 intel_engine.record_source_performance(
                     src,
-                    src_uniques,
-                    src_emails,
-                    src_phones,
-                    src_duplicates,
-                    src_avg_score
+                    unique_companies // len(req.sources),
+                    emails_found // len(req.sources),
+                    phones_found // len(req.sources),
+                    duplicate_results // len(req.sources),
+                    avg_lead_score
                 )
             add_log("Self-Improving Engine: Recalculated Source Efficiency metrics.", True)
         except Exception as e:
@@ -472,7 +840,7 @@ def run_scraper_task(req: SearchRequest, task_id: str):
         # 5. Seed Industry Dictionary automatically if keyword performance is high (Module 5)
         try:
             intel_engine.add_industry_knowledge(req.niche, "keyword", req.niche)
-            for l in no_website_leads[:3]:
+            for l in final_leads[:3]:
                 if l.get("category"):
                     intel_engine.add_industry_knowledge(req.niche, "synonym", l["category"])
                     intel_engine.add_competitor_expansion(req.niche, l["category"])
@@ -482,7 +850,7 @@ def run_scraper_task(req: SearchRequest, task_id: str):
         with lock:
             active_scan["state"] = "COMPLETED"
         
-        add_log(f"Active scan completed successfully. Saved {len(no_website_leads)} to repository.", True)
+        add_log(f"Active scan completed successfully. Saved {len(final_leads)} unique leads to repository.", True)
 
         # Update history status to COMPLETED
         if os.path.exists(history_file):
@@ -492,8 +860,8 @@ def run_scraper_task(req: SearchRequest, task_id: str):
                 for h in history:
                     if h["id"] == task_id:
                         h["status"] = "COMPLETED"
-                        h["entities_discovered"] = len(no_website_leads)
-                        h["contacts_verified"] = sum(1 for l in no_website_leads if l.get("phone") or l.get("email"))
+                        h["entities_discovered"] = len(final_leads)
+                        h["contacts_verified"] = sum(1 for l in final_leads if l.get("phone") or l.get("email"))
                         break
                 with open(history_file, "w") as f:
                     json.dump(history, f, indent=2)
@@ -501,7 +869,7 @@ def run_scraper_task(req: SearchRequest, task_id: str):
                 pass
 
     except Exception as e:
-        logger.exception("Scraper execution error")
+        logger.exception("Scraper pipeline post-processing failed")
         with lock:
             active_scan["state"] = "ERROR"
         add_log(f"Scraper execution encountered a fatal error during post-processing: {str(e)}")
@@ -557,7 +925,18 @@ def stream_results():
                 "contacts": active_scan["contacts_verified"],
                 "logs": active_scan["logs"],
                 "leads": active_scan["leads"],
-                "latency": active_scan["latency"]
+                "latency": active_scan["latency"],
+                "companies_found": active_scan["companies_found"],
+                "websites_verified": active_scan["websites_verified"],
+                "emails_extracted": active_scan["emails_extracted"],
+                "phones_extracted": active_scan["phones_extracted"],
+                "duplicates_removed": active_scan["duplicates_removed"],
+                "lead_quality_avg": active_scan["lead_quality_avg"],
+                "active_workers": active_scan["active_workers"],
+                "search_progress": active_scan["search_progress"],
+                "no_website_leads": active_scan.get("no_website_leads", 0),
+                "poor_website_leads": active_scan.get("poor_website_leads", 0),
+                "workers_activity": active_scan.get("workers_activity", {})
             }
             yield f"data: {json.dumps(initial_data)}\n\n"
             

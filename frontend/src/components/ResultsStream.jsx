@@ -109,24 +109,25 @@ export default function ResultsStream({ leads, state }) {
         </div>
       </div>
 
-      {/* List Header */}
-      <div className="grid-table-hdr">
-        <div>Company</div>
-        <div>Contact</div>
-        <div>Location</div>
-        <div>Website Status</div>
-        <div style={{ textAlign: 'right' }}>Score</div>
-      </div>
+      {/* List Header & Stream Wrapper */}
+      <div className="stream-table-wrapper">
+        <div className="grid-table-hdr">
+          <div>Company</div>
+          <div>Contact</div>
+          <div>Location</div>
+          <div>Website Status</div>
+          <div style={{ textAlign: 'right' }}>Score</div>
+        </div>
 
-      {/* Stream Container */}
-      <div className="lead-stream-container">
-        {leads.map((lead, idx) => {
-          const isExpanded = expandedLead === lead.name;
-          const tier = lead.website_tier || 'Pending Check';
-          
-          return (
-            <div key={idx} className={`lead-row-card-wrapper ${isExpanded ? 'expanded' : ''}`}>
-              <div className="lead-row-card" onClick={() => toggleExpand(lead.name)} style={{ cursor: 'pointer' }}>
+        {/* Stream Container */}
+        <div className="lead-stream-container">
+          {leads.map((lead, idx) => {
+            const isExpanded = expandedLead === lead.name;
+            const tier = lead.website_tier || 'Pending Check';
+            
+            return (
+              <div key={idx} className={`lead-row-card-wrapper ${isExpanded ? 'expanded' : ''}`}>
+                <div className="lead-row-card" onClick={() => toggleExpand(lead.name)} style={{ cursor: 'pointer' }}>
                 <div className="lead-name-col">
                   <span className="lead-name" style={{ fontWeight: 500 }}>{lead.name || 'Unknown Company'}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
@@ -343,6 +344,7 @@ export default function ResultsStream({ leads, state }) {
           );
         })}
       </div>
+    </div>
 
       {leads.length === 0 && (
         <div className="stream-empty-footer">

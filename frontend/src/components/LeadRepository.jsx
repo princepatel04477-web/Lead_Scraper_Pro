@@ -53,25 +53,59 @@ const getPlatformLabel = (source) => {
 
 const getTierColorClass = (tier) => {
   switch (tier) {
-    case 'Exceptional Website': return 'tier-exceptional';
-    case 'Good Website': return 'tier-good';
-    case 'Weak Website': return 'tier-weak';
-    case 'Dead Website': return 'tier-dead';
-    case 'No Website': return 'tier-none';
+    case 'Tier A': return 'tier-exceptional';
+    case 'Tier B': return 'tier-good';
+    case 'Tier C': return 'tier-weak';
+    case 'Tier D': return 'tier-dead';
+    case 'Tier E': return 'tier-none';
     default: return 'tier-pending';
+  }
+};
+
+const getTierCleanName = (tier) => {
+  switch (tier) {
+    case 'Tier A': return 'Exceptional';
+    case 'Tier B': return 'Good';
+    case 'Tier C': return 'Poor';
+    case 'Tier D': return 'Dead';
+    case 'Tier E': return 'No Website';
+    default: return tier || 'Pending Check';
   }
 };
 
 export default function LeadRepository({ repository, onUpdateStatus }) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('score'); // score, name, sector, website_score
+  const [sortBy, setSortBy] = useState('score'); // score, name, sector, website_opportunity_score
   const [sortOrder, setSortOrder] = useState('desc'); // desc, asc
-  const [filterTier, setFilterTier] = useState('all'); // all, exceptional, good, weak, dead, none
   const [currentPage, setCurrentPage] = useState(1);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  
+  // Advanced Filter states
+  const [filterCountry, setFilterCountry] = useState('all');
+  const [filterCity, setFilterCity] = useState('all');
+  const [filterArea, setFilterArea] = useState('all');
+  const [filterContact, setFilterContact] = useState('all'); // all, email, phone, website, no_website
+  const [filterTier, setFilterTier] = useState('all'); // all, Tier A, Tier B, Tier C, Tier D, Tier E
+  const [filterOpp, setFilterOpp] = useState('all'); // all, high_opp, redesign, seo, automation
+  const [filterScore, setFilterScore] = useState('all'); // all, 90, 80, 70, 60, below_60
+  
+  // Quick Filter Chip state
+  const [activeChip, setActiveChip] = useState(null);
+
   const itemsPerPage = 8;
 
-  // Filter leads based on search term & website quality tier
+  // Extract unique locations for selection dropdowns
+  const uniqueCountries = [...new Set(repository.map(l => l.country).filter(Boolean))].sort();
+  const uniqueCities = [...new Set(repository.map(l => l.city).filter(Boolean))].sort();
+  const uniqueAreas = [...new Set(repository.map(l => l.area || l.locality).filter(Boolean))].sort();
+
+  const handleChipClick = (chipType) => {
+    setActiveChip(prev => prev === chipType ? null : chipType);
+  };
+
+  // Filter leads based on text search, advanced filters, and quick chips
   const filteredLeads = repository.filter(lead => {
+    // 1. Text Search matching
     const term = searchTerm.toLowerCase();
     const matchesSearch = (
       (lead.name || '').toLowerCase().includes(term) ||
@@ -79,18 +113,68 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
       (lead.address || '').toLowerCase().includes(term) ||
       getPlatformLabel(lead.source).toLowerCase().includes(term)
     );
+    if (!matchesSearch) return false;
 
-    if (filterTier === 'all') return matchesSearch;
-    
+    // 2. Location Filters
+    if (filterCountry !== 'all' && lead.country !== filterCountry) return false;
+    if (filterCity !== 'all' && lead.city !== filterCity) return false;
+    const leadArea = lead.area || lead.locality || '';
+    if (filterArea !== 'all' && leadArea !== filterArea) return false;
+
+    // 3. Contact Filters
+    if (filterContact === 'email' && !lead.email) return false;
+    if (filterContact === 'phone' && !lead.phone) return false;
+    const hasWeb = lead.website && lead.website_exists !== false;
+    if (filterContact === 'website' && !hasWeb) return false;
+    if (filterContact === 'no_website' && hasWeb) return false;
+
+    // 4. Website Tier Filters
     const tier = lead.website_tier || 'Pending Check';
-    if (filterTier === 'exceptional' && tier === 'Exceptional Website') return matchesSearch;
-    if (filterTier === 'good' && tier === 'Good Website') return matchesSearch;
-    if (filterTier === 'weak' && tier === 'Weak Website') return matchesSearch;
-    if (filterTier === 'dead' && tier === 'Dead Website') return matchesSearch;
-    if (filterTier === 'none' && tier === 'No Website') return matchesSearch;
-    if (filterTier === 'pending' && tier === 'Pending Check') return matchesSearch;
-    
-    return false;
+    if (filterTier !== 'all') {
+      if (filterTier === 'exceptional' && tier !== 'Tier A') return false;
+      if (filterTier === 'good' && tier !== 'Tier B') return false;
+      if (filterTier === 'poor' && tier !== 'Tier C') return false;
+      if (filterTier === 'dead' && tier !== 'Tier D') return false;
+      if (filterTier === 'none' && tier !== 'Tier E') return false;
+    }
+
+    // 5. Opportunity Filters
+    const oppScore = lead.website_opportunity_score !== undefined ? lead.website_opportunity_score : (lead.website_score !== undefined ? (100 - lead.website_score) : 0);
+    const checks = lead.website_checks || {};
+    if (filterOpp !== 'all') {
+      if (filterOpp === 'high_opp' && oppScore < 70) return false;
+      if (filterOpp === 'redesign' && !["Tier C", "Tier D", "Tier E"].includes(tier)) return false;
+      if (filterOpp === 'seo' && checks.seo === true) return false;
+      if (filterOpp === 'automation' && checks.contact === true) return false;
+    }
+
+    // 6. Lead Quality Score Filters
+    const leadScore = parseFloat(lead.score) || 0;
+    if (filterScore !== 'all') {
+      if (filterScore === '90' && leadScore < 90) return false;
+      if (filterScore === '80' && (leadScore < 80 || leadScore >= 90)) return false;
+      if (filterScore === '70' && (leadScore < 70 || leadScore >= 80)) return false;
+      if (filterScore === '60' && (leadScore < 60 || leadScore >= 70)) return false;
+      if (filterScore === 'below_60' && leadScore >= 60) return false;
+    }
+
+    // 7. Quick Filter Chips
+    if (activeChip) {
+      if (activeChip === 'no_website' && tier !== 'Tier E') return false;
+      if (activeChip === 'poor_website' && tier !== 'Tier C') return false;
+      if (activeChip === 'has_email' && !lead.email) return false;
+      if (activeChip === 'has_phone' && !lead.phone) return false;
+      if (activeChip === 'redesign_opps' && !["Tier C", "Tier D", "Tier E"].includes(tier)) return false;
+      if (activeChip === 'high_value' && leadScore < 80) return false;
+      if (activeChip === 'highest_opp' && oppScore < 80) return false;
+      if (activeChip === 'recent') {
+        const leadDate = lead.timestamp ? new Date(lead.timestamp) : new Date();
+        const today = new Date();
+        if (leadDate.toDateString() !== today.toDateString()) return false;
+      }
+    }
+
+    return true;
   });
 
   // Sort leads
@@ -102,9 +186,9 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
     } else if (sortBy === 'sector') {
       valA = a.category || '';
       valB = b.category || '';
-    } else if (sortBy === 'website_score') {
-      valA = parseInt(a.website_score) || 0;
-      valB = parseInt(b.website_score) || 0;
+    } else if (sortBy === 'website_opportunity_score') {
+      valA = a.website_opportunity_score !== undefined ? a.website_opportunity_score : (a.website_score !== undefined ? (100 - a.website_score) : 0);
+      valB = b.website_opportunity_score !== undefined ? b.website_opportunity_score : (b.website_score !== undefined ? (100 - b.website_score) : 0);
     } else { // default: score (Lead rating)
       valA = parseFloat(a.score) || 0;
       valB = parseFloat(b.score) || 0;
@@ -120,10 +204,10 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedLeads = sortedLeads.slice(startIndex, startIndex + itemsPerPage);
 
-  // Reset page when search term or filter changes
+  // Reset page when search/filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterTier]);
+  }, [searchTerm, filterCountry, filterCity, filterArea, filterContact, filterTier, filterOpp, filterScore, activeChip]);
 
   const toggleSort = (field) => {
     if (sortBy === field) {
@@ -134,17 +218,27 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
     }
   };
 
+  const clearAllFilters = () => {
+    setFilterCountry('all');
+    setFilterCity('all');
+    setFilterArea('all');
+    setFilterContact('all');
+    setFilterTier('all');
+    setFilterOpp('all');
+    setFilterScore('all');
+    setActiveChip(null);
+    setSearchTerm('');
+  };
+
   const downloadCSV = () => {
     if (repository.length === 0) return;
     
-    // Header row
     const headers = [
-      'Name', 'Category', 'Address', 'Phone', 'Email', 'Website', 'Source', 
-      'Lead Score', 'Website Score', 'Website Tier', 'Website Health', 
-      'Opportunity Tag', 'Business Maturity', 'Recommended Priority', 'Status', 'Timestamp'
+      'Name', 'Category', 'Address', 'Locality', 'City', 'Country', 'Phone', 'Email', 'Website', 'Source', 
+      'Lead Score', 'Website Opportunity Score', 'Website Tier', 'Website Health', 
+      'Upgrade Opportunity', 'Business Maturity', 'Recommended Priority', 'Status', 'Timestamp'
     ];
     
-    // Format each value correctly (escape quotes, handle commas)
     const formatValue = (val) => {
       if (val === null || val === undefined) return '';
       const stringVal = String(val).trim();
@@ -158,13 +252,16 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
       l.name || '',
       l.category || '',
       l.address || '',
+      l.area || l.locality || '',
+      l.city || '',
+      l.country || '',
       l.phone || '',
       l.email || '',
       l.website || '',
       getPlatformLabel(l.source),
       l.score || '',
-      l.website_score !== undefined ? l.website_score : '',
-      l.website_tier || 'Pending Check',
+      l.website_opportunity_score !== undefined ? l.website_opportunity_score : (l.website_score !== undefined ? (100 - l.website_score) : ''),
+      getTierCleanName(l.website_tier),
       l.website_health || '',
       l.upgrade_opportunity || '',
       l.business_maturity || '',
@@ -178,12 +275,11 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
       ...rows.map(row => row.map(formatValue).join(','))
     ].join('\n');
 
-    // Add UTF-8 BOM to make Excel open it with correct encoding
     const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `leads_repository_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `leads_opportunity_repository_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -198,67 +294,70 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
     return name.slice(0, 2).toUpperCase();
   };
 
+  const chipStyle = (isActive) => ({
+    padding: '6px 12px',
+    background: isActive ? 'var(--primary-accent)' : 'var(--panel-bg)',
+    border: isActive ? '1px solid var(--primary-accent)' : '1px solid var(--outline)',
+    borderRadius: '20px',
+    color: isActive ? '#000' : 'var(--text-muted)',
+    fontSize: '11px',
+    fontFamily: 'var(--font-mono)',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    fontWeight: isActive ? 'bold' : 'normal',
+    whiteSpace: 'nowrap'
+  });
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
-      {/* Header and Controls */}
-      <div className="repo-header-sec">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', gap: '8px' }}>
+      {/* Header and Core Controls */}
+      <div className="repo-header-sec" style={{ paddingBottom: '4px' }}>
         <div className="repo-title-block">
-          <h2>Repository</h2>
-          <p>Saved Entities // {repository.length} Records</p>
+          <h2>Website Opportunities</h2>
+          <p>Scraped Leads // {repository.length} Records</p>
         </div>
 
-        <div className="repo-controls">
+        <div className="repo-controls" style={{ flexWrap: 'wrap', gap: '8px' }}>
           <div className="search-filter-wrapper">
-            <span className="material-symbols-outlined search-filter-icon">
-              search
-            </span>
+            <span className="material-symbols-outlined search-filter-icon">search</span>
             <input
               type="text"
-              placeholder="Filter records..."
+              placeholder="Search leads..."
               className="input-filter"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
-          <select
-            className="settings-select"
-            value={filterTier}
-            onChange={(e) => setFilterTier(e.target.value)}
-            style={{
-              padding: '6px 12px',
-              height: '34px',
-              background: 'var(--panel-bg)',
-              border: '1px solid var(--outline)',
-              borderRadius: '4px',
-              color: 'var(--text-muted)',
-              fontSize: '12px',
-              fontFamily: 'var(--font-mono)'
+          <button 
+            className="btn-secondary" 
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '4px',
+              border: showAdvancedFilters ? '1px solid var(--primary-accent)' : '1px solid var(--outline)',
+              color: showAdvancedFilters ? 'var(--primary-accent)' : 'var(--text-muted)'
             }}
           >
-            <option value="all">All Web Tiers</option>
-            <option value="exceptional">Exceptional</option>
-            <option value="good">Good</option>
-            <option value="weak">Weak</option>
-            <option value="dead">Dead</option>
-            <option value="none">No Website</option>
-            <option value="pending">Pending Check</option>
-          </select>
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>filter_list</span>
+            Filters {showAdvancedFilters ? '▲' : '▼'}
+          </button>
 
           <button 
             className="btn-secondary" 
             onClick={() => toggleSort('score')}
             style={{ minWidth: '80px' }}
           >
-            Sort: Lead Rating {sortBy === 'score' && (sortOrder === 'asc' ? '▲' : '▼')}
+            Sort: Lead Score {sortBy === 'score' && (sortOrder === 'asc' ? '▲' : '▼')}
           </button>
 
           <button 
             className="btn-secondary" 
-            onClick={() => toggleSort('website_score')}
+            onClick={() => toggleSort('website_opportunity_score')}
             style={{ minWidth: '80px' }}
           >
-            Sort: Web Score {sortBy === 'website_score' && (sortOrder === 'asc' ? '▲' : '▼')}
+            Sort: Opportunity {sortBy === 'website_opportunity_score' && (sortOrder === 'asc' ? '▲' : '▼')}
           </button>
 
           <button 
@@ -266,17 +365,144 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
             onClick={downloadCSV}
             title="Download CSV"
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
-              download
-            </span>
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>download</span>
           </button>
         </div>
       </div>
 
+      {/* Quick Filter Chips Row */}
+      <div style={{
+        display: 'flex',
+        gap: '6px',
+        overflowX: 'auto',
+        padding: '2px 0 8px 0',
+        scrollbarWidth: 'none',
+        alignItems: 'center'
+      }}>
+        <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', marginRight: '4px' }}>
+          QUICK FILTERS:
+        </span>
+        <button style={chipStyle(activeChip === 'no_website')} onClick={() => handleChipClick('no_website')}>No Website</button>
+        <button style={chipStyle(activeChip === 'poor_website')} onClick={() => handleChipClick('poor_website')}>Poor Website</button>
+        <button style={chipStyle(activeChip === 'has_email')} onClick={() => handleChipClick('has_email')}>Has Email</button>
+        <button style={chipStyle(activeChip === 'has_phone')} onClick={() => handleChipClick('has_phone')}>Has Phone</button>
+        <button style={chipStyle(activeChip === 'redesign_opps')} onClick={() => handleChipClick('redesign_opps')}>Redesign Opportunities</button>
+        <button style={chipStyle(activeChip === 'high_value')} onClick={() => handleChipClick('high_value')}>High Value Prospects</button>
+        <button style={chipStyle(activeChip === 'highest_opp')} onClick={() => handleChipClick('highest_opp')}>Highest Opportunity Score</button>
+        <button style={chipStyle(activeChip === 'recent')} onClick={() => handleChipClick('recent')}>Recently Discovered</button>
+        
+        {(activeChip || filterCountry !== 'all' || filterCity !== 'all' || filterArea !== 'all' || filterContact !== 'all' || filterTier !== 'all' || filterOpp !== 'all' || filterScore !== 'all' || searchTerm) && (
+          <button 
+            onClick={clearAllFilters}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#EF4444',
+              fontSize: '11px',
+              fontFamily: 'var(--font-mono)',
+              cursor: 'pointer',
+              marginLeft: 'auto',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Clear All
+          </button>
+        )}
+      </div>
+
+      {/* Collapsible Advanced Filters Grid */}
+      {showAdvancedFilters && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+          gap: '8px',
+          padding: '12px',
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid var(--outline)',
+          borderRadius: '4px',
+          marginBottom: '8px'
+        }}>
+          {/* Location filters */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{ fontSize: '9px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>COUNTRY</span>
+            <select className="settings-select" value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)} style={{ width: '100%' }}>
+              <option value="all">All Countries</option>
+              {uniqueCountries.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{ fontSize: '9px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>CITY</span>
+            <select className="settings-select" value={filterCity} onChange={(e) => setFilterCity(e.target.value)} style={{ width: '100%' }}>
+              <option value="all">All Cities</option>
+              {uniqueCities.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{ fontSize: '9px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>AREA / LOCALITY</span>
+            <select className="settings-select" value={filterArea} onChange={(e) => setFilterArea(e.target.value)} style={{ width: '100%' }}>
+              <option value="all">All Areas</option>
+              {uniqueAreas.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          {/* Contact filter */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{ fontSize: '9px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>CONTACTS</span>
+            <select className="settings-select" value={filterContact} onChange={(e) => setFilterContact(e.target.value)} style={{ width: '100%' }}>
+              <option value="all">All Contact States</option>
+              <option value="email">Has Email</option>
+              <option value="phone">Has Phone</option>
+              <option value="website">Has Website</option>
+              <option value="no_website">No Website</option>
+            </select>
+          </div>
+
+          {/* Website Quality Tier */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{ fontSize: '9px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>WEBSITE QUALITY</span>
+            <select className="settings-select" value={filterTier} onChange={(e) => setFilterTier(e.target.value)} style={{ width: '100%' }}>
+              <option value="all">All Web Tiers</option>
+              <option value="exceptional">Tier A: Exceptional</option>
+              <option value="good">Tier B: Good</option>
+              <option value="poor">Tier C: Poor</option>
+              <option value="dead">Tier D: Dead</option>
+              <option value="none">Tier E: No Website</option>
+            </select>
+          </div>
+
+          {/* Opportunity Filters */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{ fontSize: '9px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>OPPORTUNITY TYPES</span>
+            <select className="settings-select" value={filterOpp} onChange={(e) => setFilterOpp(e.target.value)} style={{ width: '100%' }}>
+              <option value="all">All Opportunities</option>
+              <option value="high_opp">High Opportunity (70+)</option>
+              <option value="redesign">Needs Redesign (C/D/E)</option>
+              <option value="seo">SEO Services Candidate</option>
+              <option value="automation">Needs Automation/Form</option>
+            </select>
+          </div>
+
+          {/* Lead Quality Score range */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{ fontSize: '9px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>LEAD RATING SCORE</span>
+            <select className="settings-select" value={filterScore} onChange={(e) => setFilterScore(e.target.value)} style={{ width: '100%' }}>
+              <option value="all">All Scores</option>
+              <option value="90">90+ Excellent</option>
+              <option value="80">80+ Strong</option>
+              <option value="70">70+ Moderate</option>
+              <option value="60">60+ Base</option>
+              <option value="below_60">Below 60</option>
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Main Table */}
       <div className="table-container">
         {/* Table Header */}
-        <div className="table-hdr-grid" style={{ gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1.2fr' }}>
+        <div className="table-hdr-grid" style={{ gridTemplateColumns: '2.5fr 1.2fr 1.2fr 1.5fr 1fr' }}>
           <div onClick={() => toggleSort('name')} style={{ cursor: 'pointer' }}>
             Entity Name {sortBy === 'name' && (sortOrder === 'asc' ? '▲' : '▼')}
           </div>
@@ -284,32 +510,38 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
             Sector {sortBy === 'sector' && (sortOrder === 'asc' ? '▲' : '▼')}
           </div>
           <div>Lead Rating</div>
-          <div>Website Quality</div>
+          <div>Opportunity Score</div>
           <div style={{ textAlign: 'right' }}>Status</div>
         </div>
 
         {/* Rows */}
         <div className="table-rows-container">
           {paginatedLeads.map((lead, idx) => {
-            const rawScore = parseFloat(lead.score) || 80.0;
-            const progressPercent = Math.min(Math.max((rawScore - 60) * 2.5, 10), 100);
+            const leadScore = parseFloat(lead.score) || 80.0;
+            const scorePercent = Math.min(Math.max((leadScore - 20) * 1.25, 10), 100);
             
-            const webScore = lead.website_score || 0;
+            const oppScore = lead.website_opportunity_score !== undefined ? lead.website_opportunity_score : (lead.website_score !== undefined ? (100 - lead.website_score) : 0);
             const tier = lead.website_tier || 'Pending Check';
+            const cleanTier = getTierCleanName(tier);
 
             return (
-              <div key={idx} className="table-row-item" style={{ gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1.2fr', padding: '12px 16px' }}>
+              <div key={idx} className="table-row-item" style={{ gridTemplateColumns: '2.5fr 1.2fr 1.2fr 1.5fr 1fr', padding: '12px 16px' }}>
                 <div className="repo-entity-col">
                   <div className="entity-avatar">
                     {getInitials(lead.name)}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     <span className="entity-name" style={{ fontWeight: 500 }}>{lead.name || 'Unknown Company'}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
                       {getPlatformIcon(lead.source)}
-                      <span style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
                         {getPlatformLabel(lead.source)}
                       </span>
+                      {lead.area && (
+                        <span style={{ fontSize: '10px', color: 'var(--primary-accent)', fontFamily: 'var(--font-mono)' }}>
+                          • {lead.area}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -322,29 +554,25 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
                   <div className="score-bar-bg" style={{ width: '80px' }}>
                     <div
                       className="score-bar-fill"
-                      style={{ width: `${progressPercent}%` }}
+                      style={{ width: `${scorePercent}%`, background: 'var(--primary-accent)' }}
                     ></div>
                   </div>
                   <span className="score-num" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-                    Rating: {rawScore.toFixed(1)}
+                    Rating: {leadScore.toFixed(0)}/100
                   </span>
                 </div>
 
                 <div className="repo-web-col" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <span className={`tier-badge ${getTierColorClass(tier)}`} style={{ padding: '2px 6px', fontSize: '9px', width: 'fit-content' }}>
-                    {tier}
+                    {cleanTier}
                   </span>
-                  {lead.website_exists && (
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                      Score: {webScore}/100
-                    </span>
-                  )}
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                    Opportunity: {oppScore}/100
+                  </span>
                 </div>
 
                 <div className="repo-status-col" style={{ justifyContent: 'flex-end' }}>
-                  <div
-                    className={`status-dot ${lead.status === 'Archived' ? 'archived' : 'active'}`}
-                  ></div>
+                  <div className={`status-dot ${lead.status === 'Archived' ? 'archived' : 'active'}`}></div>
                   <select
                     value={lead.status || 'Active'}
                     onChange={(e) => onUpdateStatus(lead.name, e.target.value)}
@@ -363,7 +591,7 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
 
           {sortedLeads.length === 0 && (
             <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-              No saved records found matching the filter criteria.
+              No opportunity leads matching the active filters.
             </div>
           )}
         </div>
@@ -371,7 +599,7 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
 
       {/* Pagination Footer */}
       {sortedLeads.length > 0 && (
-        <div className="pagination-footer">
+        <div className="pagination-footer" style={{ marginTop: 'auto', paddingTop: '8px' }}>
           <span className="pagination-info">
             Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, sortedLeads.length)} of {sortedLeads.length}
           </span>
@@ -382,9 +610,7 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
               style={{ opacity: currentPage === 1 ? 0.3 : 1 }}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
-                chevron_left
-              </span>
+              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>chevron_left</span>
             </button>
             <button
               className="btn-nav-page"
@@ -392,9 +618,7 @@ export default function LeadRepository({ repository, onUpdateStatus }) {
               onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
               style={{ opacity: currentPage === totalPages ? 0.3 : 1 }}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
-                chevron_right
-              </span>
+              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>chevron_right</span>
             </button>
           </div>
         </div>

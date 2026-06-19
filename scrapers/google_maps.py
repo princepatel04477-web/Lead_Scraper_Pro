@@ -89,7 +89,7 @@ class GoogleMapsScraper:
             pass  # no consent dialog
 
     # ── Scroll the results feed ─────────────────────────
-    def _scroll_feed(self, max_scrolls: int, callback=None):
+    def _scroll_feed(self, max_scrolls: int, callback=None, stop_check=None):
         """Scroll the left-hand results panel to load more listings."""
         try:
             feed = WebDriverWait(self.driver, 10).until(
@@ -103,6 +103,8 @@ class GoogleMapsScraper:
         stale_rounds = 0
 
         for i in range(max_scrolls):
+            if stop_check and stop_check():
+                break
             self.driver.execute_script(
                 "arguments[0].scrollTop = arguments[0].scrollHeight", feed
             )
@@ -383,6 +385,8 @@ class GoogleMapsScraper:
         max_results: int = 80,
         progress_callback=None,
         broaden: bool = False,
+        lead_callback=None,
+        stop_check=None,
     ) -> list[dict]:
         """
         Parameters
@@ -393,6 +397,7 @@ class GoogleMapsScraper:
         max_results : int
         progress_callback : callable(str)  optional status updater
         broaden : bool   whether to run wider search if results are low
+        lead_callback : callable(dict) optional real-time lead stream receiver
 
         Returns
         -------
@@ -408,6 +413,8 @@ class GoogleMapsScraper:
         try:
             for q_idx, query in enumerate(queries):
                 if len(businesses) >= max_results:
+                    break
+                if stop_check and stop_check():
                     break
                 if not broaden and q_idx >= 3:
                     # If not broadening, only run the top 3 highly relevant semantic queries
@@ -435,6 +442,7 @@ class GoogleMapsScraper:
                 self._scroll_feed(
                     max_scrolls=config.GOOGLE_MAPS_MAX_SCROLLS,
                     callback=progress_callback,
+                    stop_check=stop_check,
                 )
 
                 # collect all result links
@@ -459,11 +467,17 @@ class GoogleMapsScraper:
                 for idx in range(len(result_els)):
                     if len(businesses) >= max_results:
                         break
+                    if stop_check and stop_check():
+                        break
                     try:
                         # re-fetch elements (DOM may have changed)
-                        feed = self.driver.find_element(
-                            By.CSS_SELECTOR, 'div[role="feed"]'
-                        )
+                        try:
+                            feed = self.driver.find_element(
+                                By.CSS_SELECTOR, 'div[role="feed"]'
+                            )
+                        except NoSuchElementException:
+                            logger.warning("Feed container lost. Breaking query results loop.")
+                            break
                         links = feed.find_elements(
                             By.CSS_SELECTOR, 'a[href*="/maps/place/"]'
                         )
@@ -487,13 +501,12 @@ class GoogleMapsScraper:
                             name_norm = biz["name"].lower().strip()
                             if name_norm not in seen_names:
                                 seen_names.add(name_norm)
-                                if progress_callback:
-                                    progress_callback(f"Verifying website status for {biz['name']}…")
-                                biz = self._verify_website_and_instagram(biz)
+                                if lead_callback:
+                                    lead_callback(biz)
                                 businesses.append(biz)
                                 if progress_callback:
                                     progress_callback(
-                                        f"[{len(businesses)}/{max_results}]  {biz['name']} ({biz['website_status']})"
+                                        f"[{len(businesses)}/{max_results}]  {biz['name']}"
                                     )
 
                         # go back to list (press back or click back arrow)

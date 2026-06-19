@@ -64,6 +64,8 @@ class InstagramScraper:
         country: str,
         max_results: int = 40,
         progress_callback=None,
+        lead_callback=None,
+        stop_check=None,
     ) -> list[dict]:
         results: list[dict] = []
         seen_usernames: set[str] = set()
@@ -71,6 +73,8 @@ class InstagramScraper:
 
         for tag in hashtags:
             if len(results) >= max_results:
+                break
+            if stop_check and stop_check():
                 break
             if progress_callback:
                 progress_callback(f"Instagram: searching #{tag}")
@@ -85,6 +89,8 @@ class InstagramScraper:
             try:
                 for post in hashtag.get_posts():
                     if len(results) >= max_results:
+                        break
+                    if stop_check and stop_check():
                         break
                     if post_count > 60:  # limit posts scanned per tag
                         break
@@ -136,6 +142,8 @@ class InstagramScraper:
                         "maps_url": "",
                         "source": "Instagram",
                     }
+                    if lead_callback:
+                        lead_callback(biz)
                     results.append(biz)
                     if progress_callback:
                         progress_callback(

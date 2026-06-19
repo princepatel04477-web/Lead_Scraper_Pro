@@ -32,20 +32,24 @@ class YellowPagesScraper:
         country: str,
         max_results: int = 40,
         progress_callback=None,
+        lead_callback=None,
+        stop_check=None,
     ) -> list[dict]:
 
         results: list[dict] = []
 
         # try multiple directory sources
-        results += self._scrape_yellowpages(niche, city, country, max_results, progress_callback)
+        results += self._scrape_yellowpages(niche, city, country, max_results, progress_callback, lead_callback, stop_check)
         if len(results) < max_results:
-            results += self._scrape_yelp(niche, city, max_results - len(results), progress_callback)
+            if stop_check and stop_check():
+                return results[:max_results]
+            results += self._scrape_yelp(niche, city, max_results - len(results), progress_callback, lead_callback, stop_check)
 
         return results[:max_results]
 
     # ── Yellow Pages ────────────────────────────────────
     def _scrape_yellowpages(
-        self, niche, city, country, max_results, callback
+        self, niche, city, country, max_results, callback, lead_callback=None, stop_check=None
     ) -> list[dict]:
         results = []
 
@@ -67,6 +71,8 @@ class YellowPagesScraper:
         for page in range(1, 6):  # up to 5 pages
             if len(results) >= max_results:
                 break
+            if stop_check and stop_check():
+                break
 
             page_url = search_url if page == 1 else f"{search_url}&page={page}"
             try:
@@ -87,10 +93,14 @@ class YellowPagesScraper:
             for item in listings:
                 if len(results) >= max_results:
                     break
+                if stop_check and stop_check():
+                    break
 
                 biz = self._parse_yp_listing(item)
                 if biz and biz.get("name"):
                     biz["source"] = "YellowPages"
+                    if lead_callback:
+                        lead_callback(biz)
                     results.append(biz)
                     if callback:
                         callback(f"YellowPages [{len(results)}]: {biz['name']}")
@@ -146,7 +156,7 @@ class YellowPagesScraper:
         return biz
 
     # ── Yelp ────────────────────────────────────────────
-    def _scrape_yelp(self, niche, city, max_results, callback) -> list[dict]:
+    def _scrape_yelp(self, niche, city, max_results, callback, lead_callback=None, stop_check=None) -> list[dict]:
         results = []
         search_url = (
             f"https://www.yelp.com/search?"
@@ -173,6 +183,8 @@ class YellowPagesScraper:
 
         from utils.filters import classify_website_url
         for card in cards[:max_results]:
+            if stop_check and stop_check():
+                break
             biz = {}
             name_el = card.select_one("a.css-19v1rkv, h3 a, a[name]")
             biz["name"] = name_el.get_text(strip=True) if name_el else ""
@@ -192,6 +204,8 @@ class YellowPagesScraper:
             biz["source"] = "Yelp"
 
             if biz["name"]:
+                if lead_callback:
+                    lead_callback(biz)
                 results.append(biz)
                 if callback:
                     callback(f"Yelp [{len(results)}]: {biz['name']}")

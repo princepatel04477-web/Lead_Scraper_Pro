@@ -29,27 +29,34 @@ class WebsiteQualityIntelligenceSystem:
 
     def evaluate_website(self, url: str, lead_data: dict = None) -> dict:
         """
-        Determines the website quality score (0-100), Tier (A-E), Health,
-        Upgrade Opportunity, Business Maturity, and Recommended Priority.
+        Evaluates website quality, calculates the Website Opportunity Score (0-100)
+        and classifies it into Tiers A-E.
         """
         if not lead_data:
             lead_data = {}
 
-        # Default fallback structure
+        # Default fallback structure for no website
         result = {
             "website_exists": False,
-            "website_score": 0,
-            "website_tier": "No Website",
+            "website_score": 0,  # Legacy field
+            "website_opportunity_score": 100,  # Website Opportunity Score (0-100)
+            "website_tier": "Tier E",  # Tier E: No Website
             "website_health": "None",
-            "upgrade_opportunity": "None",
+            "upgrade_opportunity": "High",
             "business_maturity": "Struggling",
-            "recommended_priority": "Low",
-            "website_checks": {}
+            "recommended_priority": "Critical" if (lead_data.get("phone") or lead_data.get("email")) else "High",
+            "website_checks": {
+                "ssl": False,
+                "responsive": False,
+                "contact": False,
+                "seo": False,
+                "outdated": True,
+                "social": False,
+                "branding": False
+            }
         }
 
         if not url or not url.strip():
-            result["upgrade_opportunity"] = "High" if (lead_data.get("phone") or lead_data.get("email")) else "Medium"
-            result["recommended_priority"] = "High" if result["upgrade_opportunity"] == "High" else "Medium"
             return result
 
         url = url.strip()
@@ -58,8 +65,10 @@ class WebsiteQualityIntelligenceSystem:
         # Check for Social profile only
         is_social = any(domain in url_lower for domain in SOCIAL_DOMAINS)
         if is_social:
-            result["upgrade_opportunity"] = "High" if (lead_data.get("phone") or lead_data.get("email")) else "Medium"
-            result["recommended_priority"] = "High" if result["upgrade_opportunity"] == "High" else "Medium"
+            # Treats social profile as having "No Website" for opportunity discovery
+            result["website_exists"] = False
+            result["website_opportunity_score"] = 100
+            result["website_tier"] = "Tier E"
             return result
 
         # Ensure correct prefix
@@ -74,14 +83,20 @@ class WebsiteQualityIntelligenceSystem:
             latency = time.time() - start_time
             
             if response.status_code >= 400:
-                result["upgrade_opportunity"] = "High"
-                result["recommended_priority"] = "High"
+                result["website_exists"] = True
+                result["website_opportunity_score"] = 90  # High opportunity
+                result["website_tier"] = "Tier D"  # Dead website
+                result["website_health"] = "Broken"
+                result["website_checks"]["ssl"] = target_url.startswith("https://")
                 return result
                 
         except (requests.exceptions.RequestException, Exception) as e:
             logger.debug(f"Connection failure for {target_url}: {e}")
-            result["upgrade_opportunity"] = "High"
-            result["recommended_priority"] = "High"
+            result["website_exists"] = True
+            result["website_opportunity_score"] = 95  # Connection error / dead website
+            result["website_tier"] = "Tier D"  # Dead Website
+            result["website_health"] = "Broken"
+            result["website_checks"]["ssl"] = target_url.startswith("https://")
             return result
 
         # Page loaded successfully!
@@ -94,12 +109,12 @@ class WebsiteQualityIntelligenceSystem:
         is_parked = any(kw in page_text for kw in PARKED_KEYWORDS)
         if is_parked:
             result["website_exists"] = False
-            result["upgrade_opportunity"] = "High"
-            result["recommended_priority"] = "High"
+            result["website_opportunity_score"] = 100
+            result["website_tier"] = "Tier E"  # No website
             return result
 
         # Check for Dead Website (Placeholder, under construction, coming soon)
-        is_dead = any(kw in page_text for kw in UNDER_CONSTRUCTION_KEYWORDS)
+        is_under_construction = any(kw in page_text for kw in UNDER_CONSTRUCTION_KEYWORDS)
         html_len = len(html_content.strip())
         text_len = len(page_text.strip())
         
@@ -108,59 +123,34 @@ class WebsiteQualityIntelligenceSystem:
         inline_styles = soup.find_all("style")
         missing_css = (len(css_links) == 0 and len(inline_styles) == 0)
 
-        if is_dead or html_len < 400 or text_len < 100 or missing_css:
-            result["website_score"] = 15
-            result["website_tier"] = "Dead Website"
+        if is_under_construction or html_len < 400 or text_len < 100 or missing_css:
+            result["website_opportunity_score"] = 90
+            result["website_tier"] = "Tier D"  # Dead Website
             result["website_health"] = "Broken"
-            result["upgrade_opportunity"] = "High"
-            result["business_maturity"] = "Struggling"
-            result["recommended_priority"] = "High"
             result["website_checks"] = {
                 "ssl": target_url.startswith("https://") or response.url.startswith("https://"),
                 "responsive": False,
-                "speed": False,
                 "contact": False,
-                "about": False,
-                "services": False,
-                "team": False,
-                "portfolio": False,
-                "testimonials": False,
-                "careers": False,
-                "blog": False,
-                "multiple_contacts": False
+                "seo": False,
+                "outdated": True,
+                "social": False,
+                "branding": False
             }
             return result
 
-        # Calculate Technical Checks
-        score = 0
+        # Evaluate specific checks
         checks = {}
 
-        # 1. SSL (+10)
+        # 1. SSL
         ssl_secure = target_url.startswith("https://") or response.url.startswith("https://")
-        if ssl_secure:
-            score += 10
         checks["ssl"] = ssl_secure
 
-        # 2. Mobile Responsive (+15)
+        # 2. Mobile Responsive (viewport check)
         viewport_meta = soup.find("meta", attrs={"name": "viewport"})
         responsive = viewport_meta is not None
-        if responsive:
-            score += 15
         checks["responsive"] = responsive
 
-        # 3. Page Speed / Latency (+15)
-        # Latency < 0.8s = +15, < 1.5s = +10, < 3.0s = +5
-        speed_score = 0
-        if latency < 0.8:
-            speed_score = 15
-        elif latency < 1.5:
-            speed_score = 10
-        elif latency < 3.0:
-            speed_score = 5
-        score += speed_score
-        checks["speed"] = (speed_score >= 10)
-
-        # Scrape all link anchors for structure analysis
+        # 3. Contact Form / Channels
         links = []
         for a in soup.find_all("a", href=True):
             links.append((a.get_text().lower(), a["href"].lower()))
@@ -171,129 +161,82 @@ class WebsiteQualityIntelligenceSystem:
                     return True
             return False
 
-        # 4. Contact Page (+10)
-        has_contact = has_link(["contact", "get-in-touch", "reach-us", "find-us"])
-        if has_contact or "contact us" in page_text:
-            score += 10
+        has_contact = has_link(["contact", "get-in-touch", "reach-us", "find-us"]) or "contact us" in page_text or soup.find("form") is not None
         checks["contact"] = has_contact
 
-        # 5. About Page (+5)
-        has_about = has_link(["about", "who-we-are", "our-story", "about-us"])
-        if has_about or "about us" in page_text:
-            score += 5
-        checks["about"] = has_about
+        # 4. SEO Structure (Check for meta title, description, and h1 tags)
+        has_title = soup.title is not None and len(soup.title.get_text().strip()) > 0
+        has_desc = soup.find("meta", attrs={"name": "description"}) is not None
+        has_h1 = soup.find("h1") is not None
+        seo_structure = has_title and has_desc and has_h1
+        checks["seo"] = seo_structure
 
-        # 6. Service Pages (+10)
-        has_services = has_link(["services", "what-we-do", "products", "solutions", "our-work"])
-        if has_services or "our services" in page_text:
-            score += 10
-        checks["services"] = has_services
+        # 5. Outdated Design
+        # Checks if it uses outdated layouts (e.g. table-based layouts without modern divs)
+        # or has deprecated tags, or lacks modern tags like <header>, <nav>, <footer>
+        has_modern_tags = (soup.find("header") or soup.find("nav") or soup.find("footer")) is not None
+        has_table_layout = len(soup.find_all("table")) > 2 and len(soup.find_all("div")) < 5
+        outdated = (not has_modern_tags) or has_table_layout or (latency > 3.0) or (html_len > 5000 and len(css_links) == 0)
+        checks["outdated"] = outdated
 
-        # 7. Team Page (+5)
-        has_team = has_link(["team", "meet-the-team", "leadership", "staff", "management"])
-        if has_team or "meet the team" in page_text:
-            score += 5
-        checks["team"] = has_team
+        # 6. Social Links
+        has_social = any(any(domain in href for domain in ["facebook.com", "instagram.com", "twitter.com", "x.com", "linkedin.com", "youtube.com"]) for _, href in links)
+        checks["social"] = has_social
 
-        # 8. Portfolio (+10)
-        has_portfolio = has_link(["portfolio", "gallery", "projects", "showcase", "case-studies"])
-        if has_portfolio or "our portfolio" in page_text:
-            score += 10
-        checks["portfolio"] = has_portfolio
+        # 7. Branding (Logo or favicon check)
+        has_favicon = soup.find("link", rel=re.compile(r"icon", re.I)) is not None
+        has_logo = any("logo" in img.get("src", "").lower() or "logo" in img.get("alt", "").lower() for img in soup.find_all("img"))
+        branding = has_favicon or has_logo
+        checks["branding"] = branding
 
-        # 9. Testimonials (+5)
-        has_testimonials = has_link(["testimonials", "reviews", "feedback", "what-they-say"])
-        if has_testimonials or "testimonials" in page_text or "what clients say" in page_text:
-            score += 5
-        checks["testimonials"] = has_testimonials
+        # OPPORTUNITY SCORE CALCULATION
+        # Baseline check: is it generally a Poor website?
+        # We classify a website as poor if it fails multiple checks (responsive, SSL, SEO, etc.)
+        failed_count = sum(1 for k, v in checks.items() if not v and k != "outdated") + (1 if checks["outdated"] else 0)
+        is_poor_website = failed_count >= 3
 
-        # 10. Careers Page (+5)
-        has_careers = has_link(["careers", "jobs", "join-us", "employment"])
-        if has_careers or "careers" in page_text or "join our team" in page_text:
-            score += 5
-        checks["careers"] = has_careers
+        opp_score = 0
+        if is_poor_website:
+            opp_score += 35  # Poor Website baseline
 
-        # 11. Blog/Insights (+5)
-        has_blog = has_link(["blog", "news", "insights", "articles", "newsletters"])
-        if has_blog or "blog" in page_text or "latest news" in page_text:
-            score += 5
-        checks["blog"] = has_blog
+        if not checks["ssl"]: opp_score += 10
+        if not checks["responsive"]: opp_score += 15
+        if not checks["contact"]: opp_score += 10
+        if not checks["seo"]: opp_score += 10
+        if checks["outdated"]: opp_score += 15
+        if not checks["social"]: opp_score += 5
+        if not checks["branding"]: opp_score += 10
 
-        # 12. Multiple Contact Methods (+10)
-        # Search page text for phone numbers and email links
-        has_email_anchor = has_link(["mailto:"])
-        has_tel_anchor = has_link(["tel:"])
-        
-        # Text search fallback using regex
-        emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', page_text)
-        phones = re.findall(r'\+?\d[\d -]{8,15}\d', page_text)
-        
-        has_multiple = (has_email_anchor or len(emails) > 0) and (has_tel_anchor or len(phones) > 0)
-        if has_multiple:
-            score += 10
-        checks["multiple_contacts"] = has_multiple
+        opp_score = min(max(opp_score, 0), 100)
+        result["website_opportunity_score"] = opp_score
 
-        # Set final score and breakdown
-        result["website_score"] = min(max(score, 1), 100)
-        
-        # Classify Tier
-        if result["website_score"] <= 20:
-            result["website_tier"] = "Dead Website"
-            result["website_health"] = "Broken"
-        elif result["website_score"] <= 50:
-            result["website_tier"] = "Weak Website"
+        # CLASSIFICATION TIER
+        if opp_score >= 60:
+            result["website_tier"] = "Tier C"  # Poor Website
             result["website_health"] = "Substandard"
-        elif result["website_score"] <= 80:
-            result["website_tier"] = "Good Website"
-            result["website_health"] = "Healthy"
-        else:
-            result["website_tier"] = "Exceptional Website"
-            result["website_health"] = "Excellent"
-
-        # Determine Lead Opportunity
-        # Active business indicator
-        has_phone = lead_data.get("phone") or len(phones) > 0
-        has_email = lead_data.get("email") or len(emails) > 0
-        has_social = lead_data.get("social") or is_social
-        has_rating = lead_data.get("score") or lead_data.get("rating")
-        is_active_business = (has_phone or has_email or has_social or has_rating)
-
-        if result["website_score"] < 50 and is_active_business:
             result["upgrade_opportunity"] = "High"
-        elif result["website_score"] < 80:
-            result["upgrade_opportunity"] = "Medium"
-        else:
-            result["upgrade_opportunity"] = "Low"
-
-        # Determine Business Maturity
-        # High value client check: Score > 80 AND established indicators
-        has_locations_indicator = "locations" in page_text or "offices" in page_text or "headquarters" in page_text
-        has_large_team = has_team or "leadership team" in page_text
-        has_active_marketing = has_blog and (is_social or "newsletter" in page_text)
-        
-        is_premium_client = result["website_score"] > 80 and (has_locations_indicator or has_large_team or has_careers or has_active_marketing)
-        
-        if is_premium_client:
-            result["business_maturity"] = "Established"
-            result["upgrade_opportunity"] = "High Value Client" # Custom tag as requested
-        elif result["website_score"] > 80:
-            result["business_maturity"] = "Mature"
-        elif result["website_score"] >= 51:
-            result["business_maturity"] = "Growing"
-        elif result["website_score"] >= 21:
-            result["business_maturity"] = "Early"
-        else:
-            result["business_maturity"] = "Struggling"
-
-        # Map Recommended Priority
-        if result["upgrade_opportunity"] == "High" and (lead_data.get("phone") or lead_data.get("email")):
-            result["recommended_priority"] = "Critical"
-        elif result["upgrade_opportunity"] == "High" or result["upgrade_opportunity"] == "High Value Client":
             result["recommended_priority"] = "High"
-        elif result["upgrade_opportunity"] == "Medium":
+        elif opp_score >= 25:
+            result["website_tier"] = "Tier B"  # Good Website
+            result["website_health"] = "Healthy"
+            result["upgrade_opportunity"] = "Medium"
             result["recommended_priority"] = "Medium"
         else:
+            result["website_tier"] = "Tier A"  # Exceptional Website
+            result["website_health"] = "Excellent"
+            result["upgrade_opportunity"] = "Low"
             result["recommended_priority"] = "Low"
+
+        # Backwards compatibility
+        result["website_score"] = 100 - opp_score
+
+        # Extra contact details parsing
+        emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', page_text)
+        phones = re.findall(r'\+?\d[\d -]{8,15}\d', page_text)
+        if not lead_data.get("email") and len(emails) > 0:
+            result["email"] = emails[0]
+        if not lead_data.get("phone") and len(phones) > 0:
+            result["phone"] = phones[0]
 
         result["website_checks"] = checks
         return result

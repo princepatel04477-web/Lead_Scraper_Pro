@@ -168,7 +168,16 @@ export default function App() {
           city: data.city,
           country: data.country,
           entities: data.entities,
-          contacts: data.contacts
+          contacts: data.contacts,
+          companies_found: data.companies_found || 0,
+          websites_verified: data.websites_verified || 0,
+          emails_extracted: data.emails_extracted || 0,
+          phones_extracted: data.phones_extracted || 0,
+          duplicates_removed: data.duplicates_removed || 0,
+          lead_quality_avg: data.lead_quality_avg || 0.0,
+          active_workers: data.active_workers || 0,
+          search_progress: data.search_progress || 0.0,
+          workers_activity: data.workers_activity || {}
         });
         setIsScanning(data.state === 'ACTIVE');
       } else if (data.type === 'log') {
@@ -180,6 +189,8 @@ export default function App() {
         setStats(prev => ({ ...prev, ...data.stats }));
       } else if (data.type === 'lead_update') {
         setStreamedLeads(prev => prev.map(l => l.name === data.data.name ? data.data : l));
+        setStats(prev => ({ ...prev, ...data.stats }));
+      } else if (data.type === 'stats') {
         setStats(prev => ({ ...prev, ...data.stats }));
       }
 
@@ -360,8 +371,39 @@ export default function App() {
   // Mock scraper execution for standalone front-end mode
   const runMockScraping = (params) => {
     let step = 0;
+    const workerCount = params.worker_count || 6;
+    const targetLeads = params.target_leads || 20;
+
+    // Generate search query buckets for W workers in the mock session
+    const prefixes = ["luxury", "best", "affordable", "top", "local", "commercial", "residential", "professional", "custom", "contractor"];
+    const queries = [];
+    for (let i = 0; i < workerCount; i++) {
+      if (i === 0) {
+        queries.push(`${params.niche} ${params.city}`);
+      } else if (i < prefixes.length + 1) {
+        queries.push(`${prefixes[i-1]} ${params.niche} ${params.city}`);
+      } else {
+        queries.push(`${params.niche} ${i} ${params.city}`);
+      }
+    }
+
+    // Initialize mock workers_activity
+    const mockWorkersActivity = {};
+    for (let i = 0; i < workerCount; i++) {
+      mockWorkersActivity[`Worker ${i+1}`] = {
+        status: 'Searching',
+        query: queries[i],
+        leads_found: 0,
+        websites_verified: 0,
+        emails_extracted: 0,
+        phones_extracted: 0,
+        search_time: 0,
+        start_time: Date.now() / 1000
+      };
+    }
+
     const mockLogs = [
-      { time: 0, message: "System initialized. Connection to intelligence nodes established.", is_success: true },
+      { time: 0, message: `System initialized with ${workerCount} parallel workers. Connection to intelligence nodes established.`, is_success: true },
       { time: 1, message: `Semantic expansion: Synonyms, alternate naming generated for '${params.niche}'.`, is_success: false },
       { time: 2, message: `Query vector: Searching Google Maps index for ${params.city}, ${params.country}...`, is_success: false },
       { time: 3, message: "Ingesting Google Maps listings...", is_success: false },
@@ -374,37 +416,234 @@ export default function App() {
     ];
 
     const mockLeadsList = [
-      { name: "Acme Corp", category: params.niche, score: 98.4, address: `${params.city}, ${params.country}`, phone: "+1 555-0198", email: "j.doe@acme.io", website: "", source: "google_maps" },
-      { name: "Globex Dynamics", category: params.niche, score: 94.1, address: `${params.city}, ${params.country}`, phone: "+1 555-0245", email: "s.connor@globex.net", website: "", source: "facebook" },
-      { name: "Initech Solutions", category: params.niche, score: 89.7, address: `${params.city}, ${params.country}`, phone: "+1 555-0892", email: "m.bolton@initech.co", website: "", source: "yellowpages" },
-      { name: "Soylent Corp", category: params.niche, score: 82.3, address: `${params.city}, ${params.country}`, phone: "+1 555-0112", email: "r.thorn@soylent.io", website: "", source: "instagram" }
+      { 
+        name: "Acme Corp", 
+        category: params.niche, 
+        score: 98.0, 
+        address: `${params.city}, ${params.country}`, 
+        phone: "+1 555-0198", 
+        email: "j.doe@acme.io", 
+        website: "acme.io", 
+        source: "google_maps",
+        website_exists: true,
+        website_opportunity_score: 40,
+        website_tier: "Tier B", // Good Website
+        country: params.country || "United States",
+        city: params.city,
+        area: "Downtown",
+        website_checks: { ssl: true, responsive: true, contact: true, seo: false, outdated: false, social: true, branding: true }
+      },
+      { 
+        name: "Globex Dynamics", 
+        category: params.niche, 
+        score: 94.0, 
+        address: `${params.city}, ${params.country}`, 
+        phone: "+1 555-0245", 
+        email: "s.connor@globex.net", 
+        website: "globex.net", 
+        source: "facebook",
+        website_exists: true,
+        website_opportunity_score: 10,
+        website_tier: "Tier A", // Exceptional Website
+        country: params.country || "United States",
+        city: params.city,
+        area: "Business Hub",
+        website_checks: { ssl: true, responsive: true, contact: true, seo: true, outdated: false, social: true, branding: true }
+      },
+      { 
+        name: "Initech Solutions", 
+        category: params.niche, 
+        score: 75.0, 
+        address: `${params.city}, ${params.country}`, 
+        phone: "+1 555-0892", 
+        email: "m.bolton@initech.co", 
+        website: "initech.co", 
+        source: "yellowpages",
+        website_exists: true,
+        website_opportunity_score: 75,
+        website_tier: "Tier C", // Poor Website
+        country: params.country || "United States",
+        city: params.city,
+        area: "Commercial Zone",
+        website_checks: { ssl: false, responsive: false, contact: true, seo: false, outdated: true, social: false, branding: false }
+      },
+      { 
+        name: "Soylent Corp", 
+        category: params.niche, 
+        score: 65.0, 
+        address: `${params.city}, ${params.country}`, 
+        phone: "+1 555-0112", 
+        email: "r.thorn@soylent.io", 
+        website: "soylent.io", 
+        source: "instagram",
+        website_exists: true,
+        website_opportunity_score: 95,
+        website_tier: "Tier D", // Dead Website
+        country: params.country || "United States",
+        city: params.city,
+        area: "Industrial Zone",
+        website_checks: { ssl: false, responsive: false, contact: false, seo: false, outdated: true, social: false, branding: false }
+      },
+      { 
+        name: "Apex Services", 
+        category: params.niche, 
+        score: 55.0, 
+        address: `${params.city}, ${params.country}`, 
+        phone: "+1 555-0999", 
+        email: "info@apexservices.com", 
+        website: "", 
+        source: "google_maps",
+        website_exists: false,
+        website_opportunity_score: 100,
+        website_tier: "Tier E", // No Website
+        country: params.country || "United States",
+        city: params.city,
+        area: "Market Square",
+        website_checks: { ssl: false, responsive: false, contact: false, seo: false, outdated: true, social: false, branding: false }
+      }
     ];
 
     if (mockIntervalRef.current) clearInterval(mockIntervalRef.current);
 
     mockIntervalRef.current = setInterval(() => {
+      // Create a mutable copy of the workers activity
+      const updatedWorkers = { ...mockWorkersActivity };
+      
+      // Update elapsed search time for active workers
+      Object.keys(updatedWorkers).forEach(name => {
+        const w = updatedWorkers[name];
+        if (w.status !== 'Completed') {
+          w.search_time = Math.round((Date.now() / 1000) - w.start_time);
+        }
+      });
+
+      // Simulate worker actions based on log steps
+      if (step === 2) {
+        if (updatedWorkers['Worker 1']) {
+          updatedWorkers['Worker 1'].leads_found = 1;
+          updatedWorkers['Worker 1'].status = 'Verifying Websites';
+        }
+      } else if (step === 3) {
+        if (updatedWorkers['Worker 1']) {
+          updatedWorkers['Worker 1'].websites_verified = 1;
+          updatedWorkers['Worker 1'].emails_extracted = 1;
+          updatedWorkers['Worker 1'].phones_extracted = 1;
+          updatedWorkers['Worker 1'].status = 'Extracting Contacts';
+        }
+        if (updatedWorkers['Worker 2']) {
+          updatedWorkers['Worker 2'].leads_found = 1;
+          updatedWorkers['Worker 2'].status = 'Verifying Websites';
+        }
+      } else if (step === 5) {
+        if (updatedWorkers['Worker 1']) {
+          updatedWorkers['Worker 1'].status = 'Completed';
+        }
+        if (updatedWorkers['Worker 2']) {
+          updatedWorkers['Worker 2'].websites_verified = 1;
+          updatedWorkers['Worker 2'].emails_extracted = 1;
+          updatedWorkers['Worker 2'].phones_extracted = 1;
+          updatedWorkers['Worker 2'].status = 'Completed';
+        }
+        if (updatedWorkers['Worker 3']) {
+          updatedWorkers['Worker 3'].leads_found = 2;
+          updatedWorkers['Worker 3'].status = 'Extracting Contacts';
+        }
+      } else if (step === 7) {
+        Object.keys(updatedWorkers).forEach((name, idx) => {
+          updatedWorkers[name].status = 'Completed';
+          if (idx === 2) {
+            updatedWorkers[name].websites_verified = 2;
+            updatedWorkers[name].emails_extracted = 2;
+            updatedWorkers[name].phones_extracted = 2;
+          }
+        });
+      }
+
       if (step < mockLogs.length) {
         const log = mockLogs[step];
         setLogs(prev => [...prev, log]);
         setCurrentAction(log.message);
 
-        // Add some mock leads along the way
+        // Add mock leads along the way
         if (step === 3) {
           setStreamedLeads(prev => [mockLeadsList[0], ...prev]);
-          setStats(prev => ({ ...prev, entities: 1, contacts: 1 }));
+          setStats(prev => ({
+            ...prev,
+            entities: 1,
+            contacts: 1,
+            companies_found: 3,
+            websites_verified: 2,
+            emails_extracted: 1,
+            phones_extracted: 1,
+            duplicates_removed: 1,
+            no_website_leads: 0,
+            poor_website_leads: 0,
+            lead_quality_avg: 98.0,
+            active_workers: Math.max(0, workerCount - 1),
+            search_progress: 25,
+            workers_activity: updatedWorkers
+          }));
         } else if (step === 5) {
-          setStreamedLeads(prev => [mockLeadsList[1], ...prev]);
-          setStats(prev => ({ ...prev, entities: 2, contacts: 2 }));
+          setStreamedLeads(prev => [mockLeadsList[1], mockLeadsList[2], ...prev]);
+          setStats(prev => ({
+            ...prev,
+            entities: 3,
+            contacts: 3,
+            companies_found: 6,
+            websites_verified: 4,
+            emails_extracted: 2,
+            phones_extracted: 2,
+            duplicates_removed: 2,
+            no_website_leads: 0,
+            poor_website_leads: 1, // Initech
+            lead_quality_avg: 89.0,
+            active_workers: Math.max(0, workerCount - 2),
+            search_progress: 50,
+            workers_activity: updatedWorkers
+          }));
         } else if (step === 7) {
-          setStreamedLeads(prev => [mockLeadsList[2], mockLeadsList[3], ...prev]);
-          setStats(prev => ({ ...prev, entities: 4, contacts: 4 }));
+          setStreamedLeads(prev => [mockLeadsList[3], mockLeadsList[4], ...prev]);
+          setStats(prev => ({
+            ...prev,
+            entities: 5,
+            contacts: 5,
+            companies_found: 10,
+            websites_verified: 8,
+            emails_extracted: 4,
+            phones_extracted: 4,
+            duplicates_removed: 3,
+            no_website_leads: 1, // Apex Services
+            poor_website_leads: 2, // Initech + Soylent (Tier D)
+            lead_quality_avg: 77.2,
+            active_workers: 0,
+            search_progress: 100,
+            workers_activity: updatedWorkers
+          }));
+        } else {
+          setStats(prev => ({
+            ...prev,
+            active_workers: Math.max(0, workerCount - step),
+            workers_activity: updatedWorkers
+          }));
         }
         
         step++;
       } else {
         clearInterval(mockIntervalRef.current);
         setIsScanning(false);
-        setStats(prev => ({ ...prev, state: 'COMPLETED' }));
+        
+        // Finalize workers activity copy
+        Object.keys(updatedWorkers).forEach(name => {
+          updatedWorkers[name].status = 'Completed';
+        });
+
+        setStats(prev => ({
+          ...prev,
+          state: 'COMPLETED',
+          active_workers: 0,
+          search_progress: 100,
+          workers_activity: updatedWorkers
+        }));
         
         const timestampStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
         // Append mock results to local repository

@@ -452,56 +452,115 @@ class LeadIntelligenceEngine:
     def calculate_lead_score(self, lead: dict) -> Tuple[int, Dict[str, int]]:
         """
         Lead Score Range: 0–100. Deterministic rules.
+        Factors:
         - Website Exists = +10
-        - Email Found = +20
+        - Email Found = +15
         - Phone Found = +15
         - LinkedIn Found = +10
-        - Recent Activity / Timestamp exists = +15
-        - Multiple Contacts = +20
-        - Company Size or Rating Identified = +10
+        - Google Reviews = +10
+        - Active Social Presence = +10
+        - Business Activity = +10
+        - Contact Availability = +10
+        - Company Size = +10
         """
         score = 0
         breakdown = {}
         
-        # Website check
-        if lead.get("website"):
+        # 1. Website Exists (+10)
+        has_website = bool(lead.get("website") and lead.get("website_exists", True))
+        if has_website:
             score += 10
             breakdown["website_exists"] = 10
+        else:
+            breakdown["website_exists"] = 0
             
-        # Email check
+        # 2. Email Found (+15)
         if lead.get("email"):
-            score += 20
-            breakdown["email_found"] = 20
+            score += 15
+            breakdown["email_found"] = 15
+        else:
+            breakdown["email_found"] = 0
             
-        # Phone check
+        # 3. Phone Found (+15)
         if lead.get("phone"):
             score += 15
             breakdown["phone_found"] = 15
+        else:
+            breakdown["phone_found"] = 0
             
-        # Social check
-        if "linkedin" in lead.get("website", "").lower() or "linkedin" in lead.get("source", "").lower():
+        # 4. LinkedIn Found (+10)
+        has_linkedin = False
+        for field in ["website", "source", "linkedin_link", "facebook_link", "instagram_link"]:
+            val = lead.get(field, "")
+            if val and "linkedin.com" in str(val).lower():
+                has_linkedin = True
+                break
+        if has_linkedin:
             score += 10
             breakdown["linkedin_found"] = 10
+        else:
+            breakdown["linkedin_found"] = 0
             
-        # Recent activity / metadata existence
-        if lead.get("timestamp") or lead.get("last_scraped"):
-            score += 15
-            breakdown["recent_activity"] = 15
-            
-        # Multiple contacts
-        contact_points = 0
-        if lead.get("email"): contact_points += 1
-        if lead.get("phone"): contact_points += 1
-        if lead.get("facebook_link") or lead.get("instagram_link"): contact_points += 1
-        
-        if contact_points > 1:
-            score += 20
-            breakdown["multiple_contacts"] = 20
-            
-        # Metadata richness (Score/Rating identified)
-        if lead.get("score") or lead.get("rating"):
+        # 5. Google Reviews (+10)
+        # Check for rating, review count, or rating count
+        has_reviews = bool(lead.get("reviews_count") or lead.get("rating_count") or lead.get("rating"))
+        if has_reviews:
             score += 10
-            breakdown["metadata_richness"] = 10
+            breakdown["google_reviews"] = 10
+        else:
+            breakdown["google_reviews"] = 0
+            
+        # 6. Active Social Presence (+10)
+        has_social = False
+        for field in ["facebook_link", "instagram_link", "twitter_link", "youtube_link"]:
+            if lead.get(field):
+                has_social = True
+                break
+        # Also check website checks if evaluated
+        if lead.get("website_checks", {}).get("social"):
+            has_social = True
+            
+        if has_social:
+            score += 10
+            breakdown["active_social_presence"] = 10
+        else:
+            breakdown["active_social_presence"] = 0
+            
+        # 7. Business Activity (+10)
+        # Check if active status, or not struggling, or recently scraped
+        is_active = (lead.get("status") == "Active" or 
+                     lead.get("business_maturity") in ["Growing", "Established", "Mature"] or
+                     bool(lead.get("timestamp") or lead.get("last_scraped")))
+        if is_active:
+            score += 10
+            breakdown["business_activity"] = 10
+        else:
+            breakdown["business_activity"] = 0
+            
+        # 8. Contact Availability (+10)
+        # Check for multiple contact channels (e.g. Email + Phone, or Email + Social, or Phone + Social)
+        channels = 0
+        if lead.get("email"): channels += 1
+        if lead.get("phone"): channels += 1
+        if has_social: channels += 1
+        
+        if channels >= 2:
+            score += 10
+            breakdown["contact_availability"] = 10
+        else:
+            breakdown["contact_availability"] = 0
+            
+        # 9. Company Size (+10)
+        # Determined by reviews count (> 15), rating count, or established/mature maturity
+        has_size = (int(lead.get("reviews_count") or 0) > 15 or 
+                    int(lead.get("rating_count") or 0) > 15 or 
+                    lead.get("business_maturity") in ["Established", "Mature"] or
+                    lead.get("company_size") is not None)
+        if has_size:
+            score += 10
+            breakdown["company_size"] = 10
+        else:
+            breakdown["company_size"] = 0
             
         final_score = min(max(score, 0), 100)
         return final_score, breakdown

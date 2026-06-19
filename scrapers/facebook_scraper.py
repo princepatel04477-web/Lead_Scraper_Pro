@@ -327,6 +327,8 @@ class FacebookScraper:
         country: str,
         max_results: int = 40,
         progress_callback=None,
+        lead_callback=None,
+        stop_check=None,
     ) -> list[dict]:
         """Scrape Facebook for business listings."""
         from utils.query_generator import generate_facebook_queries
@@ -340,6 +342,8 @@ class FacebookScraper:
             # 1. Search Google for site:facebook.com listings using expanded queries
             for q_idx, query in enumerate(queries):
                 if len(unique_urls) >= max_results:
+                    break
+                if stop_check and stop_check():
                     break
 
                 # Search the first page (and second page for the primary query if needed)
@@ -405,10 +409,14 @@ class FacebookScraper:
                     }
 
                     for future in as_completed(futures):
+                        if stop_check and stop_check():
+                            break
                         url = futures[future]
                         try:
                             result = future.result()
                             if result:
+                                if lead_callback:
+                                    lead_callback(result)
                                 businesses.append(result)
                                 name = result.get("name", "Unknown")
                                 update_progress_status(name, success=True)

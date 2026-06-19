@@ -8,13 +8,14 @@ export default function SearchWorkspace({ onStartSearch, isScanning, searchHisto
   const [useYp, setUseYp] = useState(true);
   const [useInsta, setUseInsta] = useState(false);
   const [useFb, setUseFb] = useState(false);
-  const [maxResults, setMaxResults] = useState(50);
+  const [targetLeads, setTargetLeads] = useState(20);
+  const [workerCount, setWorkerCount] = useState(6);
   const [broaden, setBroaden] = useState(true);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!niche || !city || !country) {
-      alert('Please fill in Niche, City, and Country.');
+    if (!niche || !city) {
+      alert('Please fill in Niche and City.');
       return;
     }
 
@@ -34,7 +35,9 @@ export default function SearchWorkspace({ onStartSearch, isScanning, searchHisto
       city,
       country,
       sources,
-      max_results: parseInt(maxResults, 10),
+      max_results: parseInt(targetLeads, 10),
+      target_leads: parseInt(targetLeads, 10),
+      worker_count: parseInt(workerCount, 10),
       broaden,
       headless: true
     });
@@ -126,10 +129,10 @@ export default function SearchWorkspace({ onStartSearch, isScanning, searchHisto
             📘 Facebook
           </label>
           <label className="checkbox-label" style={{ marginLeft: 'auto' }}>
-            <span style={{ fontSize: '10px' }}>Max:</span>
+            <span style={{ fontSize: '10px' }}>Target Leads:</span>
             <select
-              value={maxResults}
-              onChange={(e) => setMaxResults(e.target.value)}
+              value={targetLeads}
+              onChange={(e) => setTargetLeads(e.target.value)}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -141,11 +144,32 @@ export default function SearchWorkspace({ onStartSearch, isScanning, searchHisto
               }}
               disabled={isScanning}
             >
-              <option value="10" style={{background: '#090909'}}>10</option>
-              <option value="30" style={{background: '#090909'}}>30</option>
-              <option value="50" style={{background: '#090909'}}>50</option>
-              <option value="100" style={{background: '#090909'}}>100</option>
-              <option value="200" style={{background: '#090909'}}>200</option>
+              <option value="20" style={{background: '#090909'}}>20 Leads</option>
+              <option value="50" style={{background: '#090909'}}>50 Leads</option>
+              <option value="100" style={{background: '#090909'}}>100 Leads</option>
+              <option value="250" style={{background: '#090909'}}>250 Leads</option>
+              <option value="500" style={{background: '#090909'}}>500 Leads</option>
+            </select>
+          </label>
+          <label className="checkbox-label" style={{ marginLeft: '12px' }}>
+            <span style={{ fontSize: '10px' }}>Worker Count:</span>
+            <select
+              value={workerCount}
+              onChange={(e) => setWorkerCount(e.target.value)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                borderBottom: '1px solid var(--outline)',
+                color: 'var(--text-primary)',
+                marginLeft: '4px',
+                fontSize: '11px',
+                fontFamily: 'var(--font-mono)'
+              }}
+              disabled={isScanning}
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
+                <option key={n} value={n} style={{background: '#090909'}}>{n} Workers</option>
+              ))}
             </select>
           </label>
         </div>
